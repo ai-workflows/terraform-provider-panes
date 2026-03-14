@@ -86,6 +86,7 @@ func (p *PanesProvider) Configure(ctx context.Context, req provider.ConfigureReq
 func (p *PanesProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewAgentResource,
+		NewAgentInstanceResource,
 		NewSandboxResource,
 	}
 }
