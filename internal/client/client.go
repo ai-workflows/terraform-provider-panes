@@ -219,8 +219,20 @@ func (c *Client) CreateSandbox(ctx context.Context, req CreateSandboxRequest) (*
 }
 
 func (c *Client) GetSandbox(ctx context.Context, id string) (*Sandbox, error) {
+	return c.getSandbox(ctx, id, false)
+}
+
+func (c *Client) GetSandboxRefresh(ctx context.Context, id string) (*Sandbox, error) {
+	return c.getSandbox(ctx, id, true)
+}
+
+func (c *Client) getSandbox(ctx context.Context, id string, refresh bool) (*Sandbox, error) {
+	path := "/api/sandboxes/" + id
+	if refresh {
+		path += "?refresh=true"
+	}
 	var resp Sandbox
-	if err := c.do(ctx, http.MethodGet, "/api/sandboxes/"+id+"?refresh=true", nil, &resp); err != nil {
+	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

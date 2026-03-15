@@ -194,7 +194,7 @@ func (r *SandboxResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	sb, err := r.client.GetSandbox(ctx, state.ID.ValueString())
+	sb, err := r.client.GetSandboxRefresh(ctx, state.ID.ValueString())
 	if err != nil {
 		if apiErr, ok := err.(*client.APIError); ok && apiErr.IsNotFound() {
 			resp.State.RemoveResource(ctx)
@@ -210,6 +210,15 @@ func (r *SandboxResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	state.Status = types.StringValue(sb.Status)
+	if sb.Image != "" {
+		state.Image = types.StringValue(sb.Image)
+	}
+	if sb.Compute != "" {
+		state.ComputeClass = types.StringValue(sb.Compute)
+	}
+	if sb.Metadata.Cloud != "" {
+		state.Cloud = types.StringValue(sb.Metadata.Cloud)
+	}
 	state.URL = types.StringValue(sb.URL)
 	state.VMUrl = types.StringValue(sb.Metadata.VMUrl)
 
