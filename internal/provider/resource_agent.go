@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -25,17 +24,15 @@ type AgentResource struct {
 }
 
 type AgentResourceModel struct {
-	ID                types.String `tfsdk:"id"`
-	Name              types.String `tfsdk:"name"`
-	TemplateID        types.String `tfsdk:"template_id"`
-	Model             types.String `tfsdk:"model"`
-	Status            types.String `tfsdk:"status"`
-	SystemPrompt      types.String `tfsdk:"system_prompt"`
-	ReasoningEffort   types.String `tfsdk:"reasoning_effort"`
-	AutopilotPrompt   types.String `tfsdk:"autopilot_prompt"`
-	DoneForNowEnabled types.Bool   `tfsdk:"done_for_now_enabled"`
-	SessionID         types.String `tfsdk:"session_id"`
-	MachineID         types.String `tfsdk:"machine_id"`
+	ID              types.String `tfsdk:"id"`
+	Name            types.String `tfsdk:"name"`
+	TemplateID      types.String `tfsdk:"template_id"`
+	Model           types.String `tfsdk:"model"`
+	Status          types.String `tfsdk:"status"`
+	SystemPrompt    types.String `tfsdk:"system_prompt"`
+	AutopilotPrompt types.String `tfsdk:"autopilot_prompt"`
+	SessionID       types.String `tfsdk:"session_id"`
+	MachineID       types.String `tfsdk:"machine_id"`
 }
 
 func NewAgentResource() resource.Resource {
@@ -81,21 +78,9 @@ func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: "System prompt that defines the agent's role and identity.",
 				Optional:    true,
 			},
-			"reasoning_effort": schema.StringAttribute{
-				Description: "Reasoning effort level (low, medium, high).",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("high"),
-			},
 			"autopilot_prompt": schema.StringAttribute{
 				Description: "Autopilot prompt that defines the agent's autonomous workflow.",
-				Optional:    true,
-			},
-			"done_for_now_enabled": schema.BoolAttribute{
-				Description: "Whether the agent can use the done_for_now tool to sleep.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
+				Required:    true,
 			},
 			"session_id": schema.StringAttribute{
 				Description: "Active orchestrator session ID (set when agent is running).",
@@ -128,15 +113,13 @@ func (r *AgentResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
-	doneForNow := plan.DoneForNowEnabled.ValueBool()
 	createReq := client.CreateAgentRequest{
-		Name:              plan.Name.ValueString(),
-		TemplateID:        plan.TemplateID.ValueString(),
-		Model:             plan.Model.ValueString(),
-		SystemPrompt:      plan.SystemPrompt.ValueString(),
-		ReasoningEffort:   plan.ReasoningEffort.ValueString(),
-		AutopilotPrompt:   plan.AutopilotPrompt.ValueString(),
-		DoneForNowEnabled: &doneForNow,
+		Name:            plan.Name.ValueString(),
+		TemplateID:      plan.TemplateID.ValueString(),
+		Model:           plan.Model.ValueString(),
+		SystemPrompt:    plan.SystemPrompt.ValueString(),
+		AutopilotPrompt: plan.AutopilotPrompt.ValueString(),
+		Schedule:        &client.AgentSchedule{Shifts: []any{}, OffShift: "sleep"},
 	}
 
 	agent, err := r.client.CreateAgent(ctx, createReq)
@@ -183,14 +166,11 @@ func (r *AgentResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	doneForNow := plan.DoneForNowEnabled.ValueBool()
 	updateReq := client.UpdateAgentRequest{
-		Name:              plan.Name.ValueString(),
-		Model:             plan.Model.ValueString(),
-		SystemPrompt:      plan.SystemPrompt.ValueString(),
-		ReasoningEffort:   plan.ReasoningEffort.ValueString(),
-		AutopilotPrompt:   plan.AutopilotPrompt.ValueString(),
-		DoneForNowEnabled: &doneForNow,
+		Name:            plan.Name.ValueString(),
+		Model:           plan.Model.ValueString(),
+		SystemPrompt:    plan.SystemPrompt.ValueString(),
+		AutopilotPrompt: plan.AutopilotPrompt.ValueString(),
 	}
 
 	agent, err := r.client.UpdateAgent(ctx, state.ID.ValueString(), updateReq)
@@ -236,18 +216,14 @@ func (r *AgentResource) mapAgentToState(agent *client.Agent, state *AgentResourc
 	}
 	if agent.SystemPrompt != "" {
 		state.SystemPrompt = types.StringValue(agent.SystemPrompt)
-	}
-	if agent.ReasoningEffort != "" {
-		state.ReasoningEffort = types.StringValue(agent.ReasoningEffort)
+	} else {
+		state.SystemPrompt = types.StringNull()
 	}
 	if agent.AutopilotPrompt != "" {
 		state.AutopilotPrompt = types.StringValue(agent.AutopilotPrompt)
 	}
-	if agent.DoneForNowEnabled != nil {
-		state.DoneForNowEnabled = types.BoolValue(*agent.DoneForNowEnabled)
-	}
-	if agent.SessionID != "" {
-		state.SessionID = types.StringValue(agent.SessionID)
+	if agent.OrchestratorSessionID != "" {
+		state.SessionID = types.StringValue(agent.OrchestratorSessionID)
 	} else {
 		state.SessionID = types.StringNull()
 	}

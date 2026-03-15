@@ -93,39 +93,42 @@ func (c *Client) do(ctx context.Context, method, path string, body any, result a
 
 // --- Agent types ---
 
+type AgentSchedule struct {
+	Shifts   []any  `json:"shifts"`
+	OffShift string `json:"offShift"`
+}
+
 type Agent struct {
-	ID               string          `json:"id"`
-	Name             string          `json:"name"`
-	Model            string          `json:"model"`
-	Status           string          `json:"status"`
-	TemplateID       string          `json:"templateId"`
-	SystemPrompt     string          `json:"systemPrompt"`
-	ReasoningEffort  string          `json:"reasoningEffort"`
-	MachineID        string          `json:"machineId"`
-	SessionID        string          `json:"sessionId"`
-	AutopilotPrompt  string          `json:"autopilotPrompt"`
-	DoneForNowEnabled *bool          `json:"doneForNowEnabled"`
-	CreatedAt        string          `json:"createdAt"`
-	UpdatedAt        string          `json:"updatedAt"`
+	ID                    string          `json:"id"`
+	Name                  string          `json:"name"`
+	Model                 string          `json:"model"`
+	Status                string          `json:"status"`
+	TemplateID            string          `json:"templateId"`
+	ComputeClass          string          `json:"computeClass"`
+	SystemPrompt          string          `json:"systemPrompt"`
+	AutopilotPrompt       string          `json:"autopilotPrompt"`
+	Schedule              *AgentSchedule  `json:"schedule"`
+	MachineID             string          `json:"machineId"`
+	OrchestratorSessionID string          `json:"orchestratorSessionId"`
+	CreatedAt             string          `json:"createdAt"`
+	UpdatedAt             string          `json:"updatedAt"`
 }
 
 type CreateAgentRequest struct {
-	Name              string `json:"name"`
-	TemplateID        string `json:"templateId"`
-	Model             string `json:"model,omitempty"`
-	SystemPrompt      string `json:"systemPrompt,omitempty"`
-	ReasoningEffort   string `json:"reasoningEffort,omitempty"`
-	AutopilotPrompt   string `json:"autopilotPrompt,omitempty"`
-	DoneForNowEnabled *bool  `json:"doneForNowEnabled,omitempty"`
+	Name            string         `json:"name"`
+	TemplateID      string         `json:"templateId"`
+	Model           string         `json:"model,omitempty"`
+	SystemPrompt    string         `json:"systemPrompt,omitempty"`
+	AutopilotPrompt string         `json:"autopilotPrompt"`
+	Schedule        *AgentSchedule `json:"schedule"`
 }
 
 type UpdateAgentRequest struct {
-	Name              string `json:"name,omitempty"`
-	Model             string `json:"model,omitempty"`
-	SystemPrompt      string `json:"systemPrompt,omitempty"`
-	ReasoningEffort   string `json:"reasoningEffort,omitempty"`
-	AutopilotPrompt   string `json:"autopilotPrompt,omitempty"`
-	DoneForNowEnabled *bool  `json:"doneForNowEnabled,omitempty"`
+	Name            string         `json:"name,omitempty"`
+	Model           string         `json:"model,omitempty"`
+	SystemPrompt    string         `json:"systemPrompt,omitempty"`
+	AutopilotPrompt string         `json:"autopilotPrompt,omitempty"`
+	Schedule        *AgentSchedule `json:"schedule,omitempty"`
 }
 
 func (c *Client) CreateAgent(ctx context.Context, req CreateAgentRequest) (*Agent, error) {

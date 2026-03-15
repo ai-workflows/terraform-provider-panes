@@ -14,35 +14,32 @@ func TestAccAgentResource_basic(t *testing.T) {
 			{
 				Config: `
 resource "panes_agent" "test" {
-  name              = "tf-test-agent"
-  template_id       = "custom"
-  model             = "chatgpt:gpt-5.4"
-  system_prompt     = "You are a test agent."
-  autopilot_prompt  = "Do nothing. Wait for instructions."
-  done_for_now_enabled = true
+  name             = "tf-test-agent"
+  template_id      = "custom"
+  model            = "chatgpt:gpt-5.4"
+  autopilot_prompt = "Do nothing. Wait for instructions."
 }
 `,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("panes_agent.test", "id"),
 					resource.TestCheckResourceAttr("panes_agent.test", "name", "tf-test-agent"),
 					resource.TestCheckResourceAttr("panes_agent.test", "model", "chatgpt:gpt-5.4"),
+					resource.TestCheckResourceAttr("panes_agent.test", "status", "stopped"),
 				),
 			},
 			// Update
 			{
 				Config: `
 resource "panes_agent" "test" {
-  name              = "tf-test-agent-renamed"
-  template_id       = "custom"
-  model             = "chatgpt:gpt-5.4"
-  system_prompt     = "You are an updated test agent."
-  autopilot_prompt  = "Still do nothing."
-  done_for_now_enabled = false
+  name             = "tf-test-agent-renamed"
+  template_id      = "custom"
+  model            = "chatgpt:gpt-5.4"
+  autopilot_prompt = "Still do nothing."
 }
 `,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("panes_agent.test", "name", "tf-test-agent-renamed"),
-					resource.TestCheckResourceAttr("panes_agent.test", "done_for_now_enabled", "false"),
+					resource.TestCheckResourceAttr("panes_agent.test", "autopilot_prompt", "Still do nothing."),
 				),
 			},
 			// Import

@@ -106,8 +106,8 @@ func (r *AgentInstanceResource) Create(ctx context.Context, req resource.CreateR
 
 	plan.ID = types.StringValue(agent.ID)
 	plan.Status = types.StringValue(agent.Status)
-	if agent.SessionID != "" {
-		plan.SessionID = types.StringValue(agent.SessionID)
+	if agent.OrchestratorSessionID != "" {
+		plan.SessionID = types.StringValue(agent.OrchestratorSessionID)
 	} else {
 		plan.SessionID = types.StringNull()
 	}
@@ -144,8 +144,8 @@ func (r *AgentInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	state.Status = types.StringValue(agent.Status)
-	if agent.SessionID != "" {
-		state.SessionID = types.StringValue(agent.SessionID)
+	if agent.OrchestratorSessionID != "" {
+		state.SessionID = types.StringValue(agent.OrchestratorSessionID)
 	} else {
 		state.SessionID = types.StringNull()
 	}
