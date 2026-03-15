@@ -210,24 +210,20 @@ type CreateSandboxRequest struct {
 	Project      string `json:"project,omitempty"`
 }
 
-type sandboxResponse struct {
-	Data Sandbox `json:"data"`
-}
-
 func (c *Client) CreateSandbox(ctx context.Context, req CreateSandboxRequest) (*Sandbox, error) {
-	var resp sandboxResponse
+	var resp Sandbox
 	if err := c.do(ctx, http.MethodPost, "/api/sandboxes", req, &resp); err != nil {
 		return nil, err
 	}
-	return &resp.Data, nil
+	return &resp, nil
 }
 
 func (c *Client) GetSandbox(ctx context.Context, id string) (*Sandbox, error) {
-	var resp sandboxResponse
+	var resp Sandbox
 	if err := c.do(ctx, http.MethodGet, "/api/sandboxes/"+id+"?refresh=true", nil, &resp); err != nil {
 		return nil, err
 	}
-	return &resp.Data, nil
+	return &resp, nil
 }
 
 func (c *Client) DeleteSandbox(ctx context.Context, id string) error {
