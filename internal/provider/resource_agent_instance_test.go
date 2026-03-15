@@ -10,14 +10,13 @@ func TestAccAgentInstanceResource_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Create agent, then start it
 			{
 				Config: `
 resource "panes_agent" "test" {
   name             = "tf-instance-test"
   template_id      = "custom"
   model            = "chatgpt:gpt-5.4"
-  autopilot_prompt = "Say hello and wait."
+  autopilot_prompt = "Say hello and then immediately call the done_for_now tool."
 }
 
 resource "panes_agent_instance" "test" {
