@@ -235,7 +235,9 @@ func (r *AgentResource) mapAgentToState(agent *client.Agent, state *AgentResourc
 	}
 	if agent.SystemPrompt != "" {
 		state.SystemPrompt = types.StringValue(agent.SystemPrompt)
-	} else {
+	} else if state.SystemPrompt.IsNull() || state.SystemPrompt.IsUnknown() {
+		// Only set null if state didn't already have a value (preserve plan value
+		// when the API doesn't return systemPrompt in its response)
 		state.SystemPrompt = types.StringNull()
 	}
 	if agent.AutopilotPrompt != "" {
