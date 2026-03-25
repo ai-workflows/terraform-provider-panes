@@ -11,42 +11,42 @@ provider "panes" {
   # token from PANES_TOKEN env var
 }
 
-# --- Agents (config only, not running) ---
+# --- Subscription (created and authed via Panes UI) ---
+
+data "panes_subscription" "chatgpt_pro" {
+  label = "ChatGPT Pro - chatgpt@aiworkflows.com"
+}
+
+# --- Agents ---
 
 resource "panes_agent" "builder" {
-  name                 = "meridian-builder"
-  template_id          = "custom"
-  model                = "chatgpt:gpt-5.4"
-  reasoning_effort     = "high"
-  system_prompt        = file("prompts/builder-system.md")
-  autopilot_prompt     = file("prompts/builder-autopilot.md")
-  done_for_now_enabled = false
+  name             = "meridian-builder"
+  display_name     = "Meridian Builder"
+  model            = "chatgpt:gpt-5.4"
+  system_prompt    = file("prompts/builder-system.md")
+  autopilot_prompt = file("prompts/builder-autopilot.md")
+  subscription_id  = data.panes_subscription.chatgpt_pro.id
 }
 
 resource "panes_agent" "qa" {
-  name                 = "meridian-qa"
-  template_id          = "custom"
-  model                = "chatgpt:gpt-5.4"
-  reasoning_effort     = "high"
-  system_prompt        = file("prompts/qa-system.md")
-  autopilot_prompt     = file("prompts/qa-autopilot.md")
-  done_for_now_enabled = false
+  name             = "meridian-qa"
+  display_name     = "Meridian QA"
+  model            = "chatgpt:gpt-5.4"
+  system_prompt    = file("prompts/qa-system.md")
+  autopilot_prompt = file("prompts/qa-autopilot.md")
+  subscription_id  = data.panes_subscription.chatgpt_pro.id
 }
 
 resource "panes_agent" "runtime_specialist" {
-  name                 = "meridian-runtime-specialist"
-  template_id          = "custom"
-  model                = "chatgpt:gpt-5.4"
-  reasoning_effort     = "high"
-  system_prompt        = file("prompts/runtime-specialist-system.md")
-  autopilot_prompt     = file("prompts/runtime-specialist-autopilot.md")
-  done_for_now_enabled = false
+  name             = "meridian-runtime-specialist"
+  display_name     = "Meridian Runtime Specialist"
+  model            = "chatgpt:gpt-5.4"
+  system_prompt    = file("prompts/runtime-specialist-system.md")
+  autopilot_prompt = file("prompts/runtime-specialist-autopilot.md")
+  subscription_id  = data.panes_subscription.chatgpt_pro.id
 }
 
 # --- Running instances ---
-# Creating these starts the agent (provisions sandbox + session).
-# Destroying stops the agent.
-# Comment out to stop an agent without deleting its config.
 
 resource "panes_agent_instance" "builder" {
   agent_id = panes_agent.builder.id
@@ -61,6 +61,10 @@ resource "panes_agent_instance" "runtime_specialist" {
 }
 
 # --- Outputs ---
+
+output "subscription_status" {
+  value = data.panes_subscription.chatgpt_pro.status
+}
 
 output "builder_status" {
   value = panes_agent_instance.builder.status

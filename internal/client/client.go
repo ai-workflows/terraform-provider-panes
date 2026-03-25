@@ -99,36 +99,84 @@ type AgentSchedule struct {
 }
 
 type Agent struct {
-	ID                    string          `json:"id"`
-	Name                  string          `json:"name"`
-	Model                 string          `json:"model"`
-	Status                string          `json:"status"`
-	TemplateID            string          `json:"templateId"`
-	ComputeClass          string          `json:"computeClass"`
-	SystemPrompt          string          `json:"systemPrompt"`
-	AutopilotPrompt       string          `json:"autopilotPrompt"`
-	Schedule              *AgentSchedule  `json:"schedule"`
-	MachineID             string          `json:"machineId"`
-	OrchestratorSessionID string          `json:"orchestratorSessionId"`
-	CreatedAt             string          `json:"createdAt"`
-	UpdatedAt             string          `json:"updatedAt"`
+	ID                    string         `json:"id"`
+	Name                  string         `json:"name"`
+	DisplayName           string         `json:"displayName"`
+	Model                 string         `json:"model"`
+	Status                string         `json:"status"`
+	TemplateID            string         `json:"templateId"`
+	ComputeClass          string         `json:"computeClass"`
+	SystemPrompt          string         `json:"systemPrompt"`
+	AutopilotPrompt       string         `json:"autopilotPrompt"`
+	Schedule              *AgentSchedule `json:"schedule"`
+	SubscriptionID        string         `json:"subscriptionId"`
+	MachineID             string         `json:"machineId"`
+	OrchestratorSessionID string         `json:"orchestratorSessionId"`
+	CreatedAt             string         `json:"createdAt"`
+	UpdatedAt             string         `json:"updatedAt"`
 }
 
 type CreateAgentRequest struct {
 	Name            string         `json:"name"`
+	DisplayName     string         `json:"displayName,omitempty"`
 	TemplateID      string         `json:"templateId"`
 	Model           string         `json:"model,omitempty"`
 	SystemPrompt    string         `json:"systemPrompt,omitempty"`
 	AutopilotPrompt string         `json:"autopilotPrompt"`
+	SubscriptionID  string         `json:"subscriptionId,omitempty"`
 	Schedule        *AgentSchedule `json:"schedule"`
 }
 
 type UpdateAgentRequest struct {
 	Name            string         `json:"name,omitempty"`
+	DisplayName     string         `json:"displayName,omitempty"`
 	Model           string         `json:"model,omitempty"`
 	SystemPrompt    string         `json:"systemPrompt,omitempty"`
 	AutopilotPrompt string         `json:"autopilotPrompt,omitempty"`
+	SubscriptionID  string         `json:"subscriptionId,omitempty"`
 	Schedule        *AgentSchedule `json:"schedule,omitempty"`
+}
+
+// --- Subscription types ---
+
+type Subscription struct {
+	ID                string `json:"id"`
+	OrgID             string `json:"orgId"`
+	Provider          string `json:"provider"`
+	Label             string `json:"label"`
+	PlanTier          string `json:"planTier"`
+	Status            string `json:"status"`
+	ProxyID           string `json:"proxyId"`
+	RateLimitedAt     string `json:"rateLimitedAt"`
+	RateLimitResetsAt string `json:"rateLimitResetsAt"`
+	TokensToday       int    `json:"tokensToday"`
+	CreatedAt         string `json:"createdAt"`
+	UpdatedAt         string `json:"updatedAt"`
+}
+
+type subscriptionListResponse struct {
+	Subscriptions []Subscription `json:"subscriptions"`
+}
+
+func (c *Client) ListSubscriptions(ctx context.Context) ([]Subscription, error) {
+	var resp subscriptionListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/subscriptions", nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Subscriptions, nil
+}
+
+func (c *Client) GetSubscription(ctx context.Context, id string) (*Subscription, error) {
+	subs, err := c.ListSubscriptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range subs {
+		if s.ID == id {
+			return &s, nil
+		}
+	}
+	return nil, &APIError{StatusCode: 404, Message: "subscription not found"}
 }
 
 func (c *Client) CreateAgent(ctx context.Context, req CreateAgentRequest) (*Agent, error) {

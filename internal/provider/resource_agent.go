@@ -26,11 +26,13 @@ type AgentResource struct {
 type AgentResourceModel struct {
 	ID              types.String `tfsdk:"id"`
 	Name            types.String `tfsdk:"name"`
+	DisplayName     types.String `tfsdk:"display_name"`
 	TemplateID      types.String `tfsdk:"template_id"`
 	Model           types.String `tfsdk:"model"`
 	Status          types.String `tfsdk:"status"`
 	SystemPrompt    types.String `tfsdk:"system_prompt"`
 	AutopilotPrompt types.String `tfsdk:"autopilot_prompt"`
+	SubscriptionID  types.String `tfsdk:"subscription_id"`
 	SessionID       types.String `tfsdk:"session_id"`
 	MachineID       types.String `tfsdk:"machine_id"`
 }
@@ -55,8 +57,12 @@ func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Agent name.",
+				Description: "Agent name (identifier).",
 				Required:    true,
+			},
+			"display_name": schema.StringAttribute{
+				Description: "Human-readable display name.",
+				Optional:    true,
 			},
 			"template_id": schema.StringAttribute{
 				Description: "Agent template (developer-engineer, devops-sre, project-manager, custom).",
@@ -81,6 +87,10 @@ func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			"autopilot_prompt": schema.StringAttribute{
 				Description: "Autopilot prompt that defines the agent's autonomous workflow.",
 				Required:    true,
+			},
+			"subscription_id": schema.StringAttribute{
+				Description: "ChatGPT subscription ID to pin this agent to. Use data.panes_subscription to look up.",
+				Optional:    true,
 			},
 			"session_id": schema.StringAttribute{
 				Description: "Active orchestrator session ID (set when agent is running).",
@@ -115,10 +125,12 @@ func (r *AgentResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	createReq := client.CreateAgentRequest{
 		Name:            plan.Name.ValueString(),
+		DisplayName:     plan.DisplayName.ValueString(),
 		TemplateID:      plan.TemplateID.ValueString(),
 		Model:           plan.Model.ValueString(),
 		SystemPrompt:    plan.SystemPrompt.ValueString(),
 		AutopilotPrompt: plan.AutopilotPrompt.ValueString(),
+		SubscriptionID:  plan.SubscriptionID.ValueString(),
 		Schedule:        &client.AgentSchedule{Shifts: []any{}, OffShift: "sleep"},
 	}
 
@@ -168,9 +180,11 @@ func (r *AgentResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 	updateReq := client.UpdateAgentRequest{
 		Name:            plan.Name.ValueString(),
+		DisplayName:     plan.DisplayName.ValueString(),
 		Model:           plan.Model.ValueString(),
 		SystemPrompt:    plan.SystemPrompt.ValueString(),
 		AutopilotPrompt: plan.AutopilotPrompt.ValueString(),
+		SubscriptionID:  plan.SubscriptionID.ValueString(),
 	}
 
 	agent, err := r.client.UpdateAgent(ctx, state.ID.ValueString(), updateReq)
@@ -208,6 +222,11 @@ func (r *AgentResource) mapAgentToState(agent *client.Agent, state *AgentResourc
 	state.Name = types.StringValue(agent.Name)
 	state.Status = types.StringValue(agent.Status)
 
+	if agent.DisplayName != "" {
+		state.DisplayName = types.StringValue(agent.DisplayName)
+	} else {
+		state.DisplayName = types.StringNull()
+	}
 	if agent.TemplateID != "" {
 		state.TemplateID = types.StringValue(agent.TemplateID)
 	}
@@ -221,6 +240,11 @@ func (r *AgentResource) mapAgentToState(agent *client.Agent, state *AgentResourc
 	}
 	if agent.AutopilotPrompt != "" {
 		state.AutopilotPrompt = types.StringValue(agent.AutopilotPrompt)
+	}
+	if agent.SubscriptionID != "" {
+		state.SubscriptionID = types.StringValue(agent.SubscriptionID)
+	} else {
+		state.SubscriptionID = types.StringNull()
 	}
 	if agent.OrchestratorSessionID != "" {
 		state.SessionID = types.StringValue(agent.OrchestratorSessionID)
