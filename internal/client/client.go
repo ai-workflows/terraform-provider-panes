@@ -14,14 +14,16 @@ import (
 type Client struct {
 	BaseURL    string
 	Token      string
+	OrgID      string
 	HTTPClient *http.Client
 }
 
 // New creates a new Panes API client.
-func New(baseURL, token string) *Client {
+func New(baseURL, token, orgID string) *Client {
 	return &Client{
 		BaseURL: baseURL,
 		Token:   token,
+		OrgID:   orgID,
 		HTTPClient: &http.Client{
 			Timeout: 5 * time.Minute, // sandbox provisioning can be slow
 		},
@@ -59,6 +61,9 @@ func (c *Client) do(ctx context.Context, method, path string, body any, result a
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.Token)
+	if c.OrgID != "" {
+		req.Header.Set("X-Org-Id", c.OrgID)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

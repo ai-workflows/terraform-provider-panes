@@ -21,6 +21,7 @@ type PanesProvider struct {
 type PanesProviderModel struct {
 	APIURL types.String `tfsdk:"api_url"`
 	Token  types.String `tfsdk:"token"`
+	OrgID  types.String `tfsdk:"org_id"`
 }
 
 func New(version string) func() provider.Provider {
@@ -47,6 +48,10 @@ func (p *PanesProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 				Optional:    true,
 				Sensitive:   true,
 			},
+			"org_id": schema.StringAttribute{
+				Description: "Organization ID to scope all operations to. Can also be set with the PANES_ORG_ID environment variable.",
+				Optional:    true,
+			},
 		},
 	}
 }
@@ -63,7 +68,7 @@ func (p *PanesProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		apiURL = config.APIURL.ValueString()
 	}
 	if apiURL == "" {
-		apiURL = "https://app.a9s.dev"
+		apiURL = "https://panes.infra.aiworkflows.com"
 	}
 
 	token := os.Getenv("PANES_TOKEN")
@@ -78,7 +83,12 @@ func (p *PanesProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		return
 	}
 
-	c := client.New(apiURL, token)
+	orgID := os.Getenv("PANES_ORG_ID")
+	if !config.OrgID.IsNull() {
+		orgID = config.OrgID.ValueString()
+	}
+
+	c := client.New(apiURL, token, orgID)
 	resp.DataSourceData = c
 	resp.ResourceData = c
 }
