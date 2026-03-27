@@ -26,7 +26,7 @@ type SubscriptionResource struct {
 type SubscriptionResourceModel struct {
 	ID       types.String `tfsdk:"id"`
 	Label    types.String `tfsdk:"label"`
-	Provider types.String `tfsdk:"provider"`
+	Provider types.String `tfsdk:"service_provider"`
 	Tier     types.String `tfsdk:"tier"`
 	Status   types.String `tfsdk:"status"`
 }
@@ -54,7 +54,7 @@ func (r *SubscriptionResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description: "Human-readable label (e.g. 'ChatGPT Pro - team@company.com').",
 				Required:    true,
 			},
-			"provider": schema.StringAttribute{
+			"service_provider": schema.StringAttribute{
 				Description: "LLM provider (chatgpt).",
 				Optional:    true,
 				Computed:    true,
