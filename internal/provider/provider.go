@@ -98,6 +98,7 @@ func (p *PanesProvider) Resources(_ context.Context) []func() resource.Resource 
 		NewAgentResource,
 		NewAgentInstanceResource,
 		NewSandboxResource,
+		NewSubscriptionResource,
 	}
 }
 

@@ -178,9 +178,12 @@ func (c *Client) GetAgentIdentity(ctx context.Context, id string) (*AgentIdentit
 type Subscription struct {
 	ID                string `json:"id"`
 	OrgID             string `json:"orgId"`
+	UserID            string `json:"userId"`
+	OrchestratorID    string `json:"orchestratorId"`
 	Provider          string `json:"provider"`
 	Label             string `json:"label"`
-	PlanTier          string `json:"planTier"`
+	Tier              string `json:"tier"`
+	PlanTier          string `json:"planTier"` // legacy field from orchestrator
 	Status            string `json:"status"`
 	ProxyID           string `json:"proxyId"`
 	RateLimitedAt     string `json:"rateLimitedAt"`
@@ -188,6 +191,37 @@ type Subscription struct {
 	TokensToday       int    `json:"tokensToday"`
 	CreatedAt         string `json:"createdAt"`
 	UpdatedAt         string `json:"updatedAt"`
+}
+
+type CreateSubscriptionRequest struct {
+	Label    string `json:"label"`
+	Provider string `json:"provider,omitempty"`
+	Tier     string `json:"tier,omitempty"`
+}
+
+type UpdateSubscriptionRequest struct {
+	Label string `json:"label,omitempty"`
+	Tier  string `json:"tier,omitempty"`
+}
+
+func (c *Client) CreateSubscription(ctx context.Context, req CreateSubscriptionRequest) (*Subscription, error) {
+	var resp Subscription
+	if err := c.do(ctx, http.MethodPost, "/api/subscriptions", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *Client) UpdateSubscription(ctx context.Context, id string, req UpdateSubscriptionRequest) (*Subscription, error) {
+	var resp Subscription
+	if err := c.do(ctx, http.MethodPatch, "/api/subscriptions/"+id, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *Client) DeleteSubscription(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/api/subscriptions/"+id, nil, nil)
 }
 
 type subscriptionListResponse struct {
@@ -203,6 +237,12 @@ func (c *Client) ListSubscriptions(ctx context.Context) ([]Subscription, error) 
 }
 
 func (c *Client) GetSubscription(ctx context.Context, id string) (*Subscription, error) {
+	// Try direct GET first (new Panes DB-backed endpoint)
+	var resp Subscription
+	if err := c.do(ctx, http.MethodGet, "/api/subscriptions/"+id, nil, &resp); err == nil {
+		return &resp, nil
+	}
+	// Fallback to listing (for data source lookups by label)
 	subs, err := c.ListSubscriptions(ctx)
 	if err != nil {
 		return nil, err
