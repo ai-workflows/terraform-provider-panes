@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -24,17 +25,21 @@ type AgentResource struct {
 }
 
 type AgentResourceModel struct {
-	ID              types.String `tfsdk:"id"`
-	Name            types.String `tfsdk:"name"`
-	DisplayName     types.String `tfsdk:"display_name"`
-	TemplateID      types.String `tfsdk:"template_id"`
-	Model           types.String `tfsdk:"model"`
-	Status          types.String `tfsdk:"status"`
-	SystemPrompt    types.String `tfsdk:"system_prompt"`
-	AutopilotPrompt types.String `tfsdk:"autopilot_prompt"`
-	SubscriptionID  types.String `tfsdk:"subscription_id"`
-	SessionID       types.String `tfsdk:"session_id"`
-	MachineID       types.String `tfsdk:"machine_id"`
+	ID                 types.String `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
+	DisplayName        types.String `tfsdk:"display_name"`
+	TemplateID         types.String `tfsdk:"template_id"`
+	Model              types.String `tfsdk:"model"`
+	ComputeClass       types.String `tfsdk:"compute_class"`
+	Status             types.String `tfsdk:"status"`
+	SystemPrompt       types.String `tfsdk:"system_prompt"`
+	AutopilotPrompt    types.String `tfsdk:"autopilot_prompt"`
+	Capabilities       types.List   `tfsdk:"capabilities"`
+	SubscriptionID     types.String `tfsdk:"subscription_id"`
+	ExistingAISAgentID types.String `tfsdk:"existing_ais_agent_id"`
+	AISAgentID         types.String `tfsdk:"ais_agent_id"`
+	SessionID          types.String `tfsdk:"session_id"`
+	MachineID          types.String `tfsdk:"machine_id"`
 }
 
 func NewAgentResource() resource.Resource {
@@ -88,9 +93,35 @@ func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: "Autopilot prompt that defines the agent's autonomous workflow.",
 				Required:    true,
 			},
+			"compute_class": schema.StringAttribute{
+				Description: "Sandbox compute class (e.g. standard, standard-2, performance).",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("standard-2"),
+			},
+			"capabilities": schema.ListAttribute{
+				Description: "Agent capabilities (e.g. [\"browser\"] for web browsing).",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"subscription_id": schema.StringAttribute{
 				Description: "ChatGPT subscription ID to pin this agent to. Use data.panes_subscription to look up.",
 				Optional:    true,
+			},
+			"existing_ais_agent_id": schema.StringAttribute{
+				Description: "Existing AIS agent ID to reuse identity/credentials from. If omitted, a new identity is created.",
+				Optional:    true,
+			},
+			"ais_agent_id": schema.StringAttribute{
+				Description: "AIS agent ID (auto-assigned on create, or set via existing_ais_agent_id).",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"session_id": schema.StringAttribute{
 				Description: "Active orchestrator session ID (set when agent is running).",
@@ -123,15 +154,27 @@ func (r *AgentResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
+	// Extract capabilities from plan
+	var capabilities []string
+	if !plan.Capabilities.IsNull() && !plan.Capabilities.IsUnknown() {
+		resp.Diagnostics.Append(plan.Capabilities.ElementsAs(ctx, &capabilities, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	createReq := client.CreateAgentRequest{
-		Name:            plan.Name.ValueString(),
-		DisplayName:     plan.DisplayName.ValueString(),
-		TemplateID:      plan.TemplateID.ValueString(),
-		Model:           plan.Model.ValueString(),
-		SystemPrompt:    plan.SystemPrompt.ValueString(),
-		AutopilotPrompt: plan.AutopilotPrompt.ValueString(),
-		SubscriptionID:  plan.SubscriptionID.ValueString(),
-		Schedule:        &client.AgentSchedule{Shifts: []any{}, OffShift: "sleep"},
+		Name:               plan.Name.ValueString(),
+		DisplayName:        plan.DisplayName.ValueString(),
+		TemplateID:         plan.TemplateID.ValueString(),
+		Model:              plan.Model.ValueString(),
+		ComputeClass:       plan.ComputeClass.ValueString(),
+		SystemPrompt:       plan.SystemPrompt.ValueString(),
+		AutopilotPrompt:    plan.AutopilotPrompt.ValueString(),
+		Capabilities:       capabilities,
+		SubscriptionID:     plan.SubscriptionID.ValueString(),
+		ExistingAISAgentID: plan.ExistingAISAgentID.ValueString(),
+		Schedule:           &client.AgentSchedule{Shifts: []any{}, OffShift: "sleep"},
 	}
 
 	agent, err := r.client.CreateAgent(ctx, createReq)
@@ -178,12 +221,22 @@ func (r *AgentResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
+	var updateCaps []string
+	if !plan.Capabilities.IsNull() && !plan.Capabilities.IsUnknown() {
+		resp.Diagnostics.Append(plan.Capabilities.ElementsAs(ctx, &updateCaps, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	updateReq := client.UpdateAgentRequest{
 		Name:            plan.Name.ValueString(),
 		DisplayName:     plan.DisplayName.ValueString(),
 		Model:           plan.Model.ValueString(),
+		ComputeClass:    plan.ComputeClass.ValueString(),
 		SystemPrompt:    plan.SystemPrompt.ValueString(),
 		AutopilotPrompt: plan.AutopilotPrompt.ValueString(),
+		Capabilities:    updateCaps,
 		SubscriptionID:  plan.SubscriptionID.ValueString(),
 	}
 
@@ -247,6 +300,23 @@ func (r *AgentResource) mapAgentToState(agent *client.Agent, state *AgentResourc
 		state.SubscriptionID = types.StringValue(agent.SubscriptionID)
 	} else {
 		state.SubscriptionID = types.StringNull()
+	}
+	if agent.ComputeClass != "" {
+		state.ComputeClass = types.StringValue(agent.ComputeClass)
+	}
+	if len(agent.Capabilities) > 0 {
+		caps := make([]types.String, len(agent.Capabilities))
+		for i, c := range agent.Capabilities {
+			caps[i] = types.StringValue(c)
+		}
+		state.Capabilities, _ = types.ListValueFrom(context.Background(), types.StringType, agent.Capabilities)
+	} else if state.Capabilities.IsNull() || state.Capabilities.IsUnknown() {
+		state.Capabilities, _ = types.ListValueFrom(context.Background(), types.StringType, []string{})
+	}
+	if agent.AISAgentID != "" {
+		state.AISAgentID = types.StringValue(agent.AISAgentID)
+	} else {
+		state.AISAgentID = types.StringNull()
 	}
 	if agent.OrchestratorSessionID != "" {
 		state.SessionID = types.StringValue(agent.OrchestratorSessionID)

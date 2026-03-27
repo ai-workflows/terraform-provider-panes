@@ -113,33 +113,64 @@ type Agent struct {
 	ComputeClass          string         `json:"computeClass"`
 	SystemPrompt          string         `json:"systemPrompt"`
 	AutopilotPrompt       string         `json:"autopilotPrompt"`
+	Capabilities          []string       `json:"capabilities"`
 	Schedule              *AgentSchedule `json:"schedule"`
 	SubscriptionID        string         `json:"subscriptionId"`
 	MachineID             string         `json:"machineId"`
+	AISAgentID            string         `json:"aisAgentId"`
 	OrchestratorSessionID string         `json:"orchestratorSessionId"`
 	CreatedAt             string         `json:"createdAt"`
 	UpdatedAt             string         `json:"updatedAt"`
 }
 
 type CreateAgentRequest struct {
-	Name            string         `json:"name"`
-	DisplayName     string         `json:"displayName,omitempty"`
-	TemplateID      string         `json:"templateId"`
-	Model           string         `json:"model,omitempty"`
-	SystemPrompt    string         `json:"systemPrompt,omitempty"`
-	AutopilotPrompt string         `json:"autopilotPrompt"`
-	SubscriptionID  string         `json:"subscriptionId,omitempty"`
-	Schedule        *AgentSchedule `json:"schedule"`
+	Name               string         `json:"name"`
+	DisplayName        string         `json:"displayName,omitempty"`
+	TemplateID         string         `json:"templateId"`
+	Model              string         `json:"model,omitempty"`
+	ComputeClass       string         `json:"computeClass,omitempty"`
+	SystemPrompt       string         `json:"systemPrompt,omitempty"`
+	AutopilotPrompt    string         `json:"autopilotPrompt"`
+	Capabilities       []string       `json:"capabilities,omitempty"`
+	SubscriptionID     string         `json:"subscriptionId,omitempty"`
+	ExistingAISAgentID string         `json:"existingAisAgentId,omitempty"`
+	Schedule           *AgentSchedule `json:"schedule"`
 }
 
 type UpdateAgentRequest struct {
 	Name            string         `json:"name,omitempty"`
 	DisplayName     string         `json:"displayName,omitempty"`
 	Model           string         `json:"model,omitempty"`
+	ComputeClass    string         `json:"computeClass,omitempty"`
 	SystemPrompt    string         `json:"systemPrompt,omitempty"`
 	AutopilotPrompt string         `json:"autopilotPrompt,omitempty"`
+	Capabilities    []string       `json:"capabilities,omitempty"`
 	SubscriptionID  string         `json:"subscriptionId,omitempty"`
 	Schedule        *AgentSchedule `json:"schedule,omitempty"`
+}
+
+// AgentIdentity holds the AIS identity details for an agent.
+type AgentIdentity struct {
+	AISAgentID  string              `json:"aisAgentId"`
+	Identity    *AgentIdentityInfo  `json:"identity"`
+	Credentials []AgentCredential   `json:"credentials"`
+}
+
+type AgentIdentityInfo struct {
+	Email       string `json:"email"`
+	DisplayName string `json:"display_name"`
+}
+
+type AgentCredential struct {
+	Service string `json:"service"`
+}
+
+func (c *Client) GetAgentIdentity(ctx context.Context, id string) (*AgentIdentity, error) {
+	var resp AgentIdentity
+	if err := c.do(ctx, http.MethodGet, "/api/agents/"+id+"/identity", nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 // --- Subscription types ---
