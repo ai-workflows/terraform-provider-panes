@@ -36,6 +36,7 @@ type AgentResourceModel struct {
 	AutopilotPrompt    types.String `tfsdk:"autopilot_prompt"`
 	Capabilities       types.List   `tfsdk:"capabilities"`
 	SubscriptionID     types.String `tfsdk:"subscription_id"`
+	Email              types.String `tfsdk:"email"`
 	ExistingAISAgentID types.String `tfsdk:"existing_ais_agent_id"`
 	AISAgentID         types.String `tfsdk:"ais_agent_id"`
 	SessionID          types.String `tfsdk:"session_id"`
@@ -112,6 +113,11 @@ func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: "ChatGPT subscription ID to pin this agent to. Use data.panes_subscription to look up.",
 				Optional:    true,
 			},
+			"email": schema.StringAttribute{
+				Description: "Agent email address (must end with @mail.a9s.dev). Auto-generated if omitted.",
+				Optional:    true,
+				Computed:    true,
+			},
 			"existing_ais_agent_id": schema.StringAttribute{
 				Description: "Existing AIS agent ID to reuse identity/credentials from. If omitted, a new identity is created.",
 				Optional:    true,
@@ -172,6 +178,7 @@ func (r *AgentResource) Create(ctx context.Context, req resource.CreateRequest, 
 		SystemPrompt:       plan.SystemPrompt.ValueString(),
 		AutopilotPrompt:    plan.AutopilotPrompt.ValueString(),
 		Capabilities:       capabilities,
+		Email:              plan.Email.ValueString(),
 		SubscriptionID:     plan.SubscriptionID.ValueString(),
 		ExistingAISAgentID: plan.ExistingAISAgentID.ValueString(),
 		Schedule:           &client.AgentSchedule{Shifts: []any{}, OffShift: "sleep"},
@@ -237,6 +244,7 @@ func (r *AgentResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		SystemPrompt:    plan.SystemPrompt.ValueString(),
 		AutopilotPrompt: plan.AutopilotPrompt.ValueString(),
 		Capabilities:    updateCaps,
+		Email:           plan.Email.ValueString(),
 		SubscriptionID:  plan.SubscriptionID.ValueString(),
 	}
 
