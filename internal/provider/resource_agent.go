@@ -298,6 +298,11 @@ func (r *AgentResource) mapAgentToState(agent *client.Agent, state *AgentResourc
 	state.Name = types.StringValue(agent.Name)
 	state.Status = types.StringValue(agent.Status)
 
+	if agent.Email != "" {
+		state.Email = types.StringValue(agent.Email)
+	} else if state.Email.IsUnknown() {
+		state.Email = types.StringNull()
+	}
 	if agent.DisplayName != "" {
 		state.DisplayName = types.StringValue(agent.DisplayName)
 	} else {

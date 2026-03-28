@@ -106,6 +106,7 @@ type AgentSchedule struct {
 type Agent struct {
 	ID                    string         `json:"id"`
 	Name                  string         `json:"name"`
+	Email                 string         `json:"email"`
 	DisplayName           string         `json:"displayName"`
 	Model                 string         `json:"model"`
 	Status                string         `json:"status"`
