@@ -133,6 +133,7 @@ type CreateAgentRequest struct {
 	AutopilotPrompt    string         `json:"autopilotPrompt"`
 	Capabilities       []string       `json:"capabilities,omitempty"`
 	Email              string         `json:"email,omitempty"`
+	DoneForNowEnabled  *bool          `json:"doneForNowEnabled,omitempty"`
 	SubscriptionID     string         `json:"subscriptionId,omitempty"`
 	ExistingAISAgentID string         `json:"existingAisAgentId,omitempty"`
 	Schedule           *AgentSchedule `json:"schedule"`
@@ -146,9 +147,10 @@ type UpdateAgentRequest struct {
 	SystemPrompt    string         `json:"systemPrompt,omitempty"`
 	AutopilotPrompt string         `json:"autopilotPrompt,omitempty"`
 	Capabilities    []string       `json:"capabilities,omitempty"`
-	Email           string         `json:"email,omitempty"`
-	SubscriptionID  string         `json:"subscriptionId,omitempty"`
-	Schedule        *AgentSchedule `json:"schedule,omitempty"`
+	Email             string         `json:"email,omitempty"`
+	DoneForNowEnabled *bool          `json:"doneForNowEnabled,omitempty"`
+	SubscriptionID    string         `json:"subscriptionId,omitempty"`
+	Schedule          *AgentSchedule `json:"schedule,omitempty"`
 }
 
 // AgentIdentity holds the AIS identity details for an agent.

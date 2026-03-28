@@ -37,6 +37,7 @@ type AgentResourceModel struct {
 	Capabilities       types.List   `tfsdk:"capabilities"`
 	SubscriptionID     types.String `tfsdk:"subscription_id"`
 	Email              types.String `tfsdk:"email"`
+	DoneForNowEnabled  types.Bool   `tfsdk:"done_for_now_enabled"`
 	ExistingAISAgentID types.String `tfsdk:"existing_ais_agent_id"`
 	AISAgentID         types.String `tfsdk:"ais_agent_id"`
 	SessionID          types.String `tfsdk:"session_id"`
@@ -118,6 +119,10 @@ func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Optional:    true,
 				Computed:    true,
 			},
+			"done_for_now_enabled": schema.BoolAttribute{
+				Description: "Whether the agent can call done_for_now to sleep after a work cycle. Defaults to false (continuous work).",
+				Optional:    true,
+			},
 			"existing_ais_agent_id": schema.StringAttribute{
 				Description: "Existing AIS agent ID to reuse identity/credentials from. If omitted, a new identity is created.",
 				Optional:    true,
@@ -179,6 +184,7 @@ func (r *AgentResource) Create(ctx context.Context, req resource.CreateRequest, 
 		AutopilotPrompt:    plan.AutopilotPrompt.ValueString(),
 		Capabilities:       capabilities,
 		Email:              plan.Email.ValueString(),
+		DoneForNowEnabled:  boolPtrFromTF(plan.DoneForNowEnabled),
 		SubscriptionID:     plan.SubscriptionID.ValueString(),
 		ExistingAISAgentID: plan.ExistingAISAgentID.ValueString(),
 		Schedule:           &client.AgentSchedule{Shifts: []any{}, OffShift: "sleep"},
@@ -244,8 +250,9 @@ func (r *AgentResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		SystemPrompt:    plan.SystemPrompt.ValueString(),
 		AutopilotPrompt: plan.AutopilotPrompt.ValueString(),
 		Capabilities:    updateCaps,
-		Email:           plan.Email.ValueString(),
-		SubscriptionID:  plan.SubscriptionID.ValueString(),
+		Email:             plan.Email.ValueString(),
+		DoneForNowEnabled: boolPtrFromTF(plan.DoneForNowEnabled),
+		SubscriptionID:    plan.SubscriptionID.ValueString(),
 	}
 
 	agent, err := r.client.UpdateAgent(ctx, state.ID.ValueString(), updateReq)
@@ -272,6 +279,14 @@ func (r *AgentResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		}
 		resp.Diagnostics.AddError("Error deleting agent", err.Error())
 	}
+}
+
+func boolPtrFromTF(v types.Bool) *bool {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	val := v.ValueBool()
+	return &val
 }
 
 func (r *AgentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
