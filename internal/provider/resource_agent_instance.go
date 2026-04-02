@@ -176,8 +176,15 @@ func (r *AgentInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 	// Pause the agent (stops autopilot, keeps session data)
 	_, err := r.client.PauseAgent(ctx, agentID)
 	if err != nil {
-		if apiErr, ok := err.(*client.APIError); ok && apiErr.IsNotFound() {
-			return // already gone
+		if apiErr, ok := err.(*client.APIError); ok {
+			if apiErr.IsNotFound() {
+				return // already gone
+			}
+			// Agent may already be stopped/error — not active is fine for delete
+			if apiErr.StatusCode == 400 {
+				tflog.Warn(ctx, "Agent not active, skipping pause", map[string]any{"agent_id": agentID, "error": err.Error()})
+				return
+			}
 		}
 		resp.Diagnostics.AddError("Error stopping agent", err.Error())
 	}
