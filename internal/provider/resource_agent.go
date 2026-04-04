@@ -42,6 +42,11 @@ type AgentResourceModel struct {
 	AISAgentID         types.String `tfsdk:"ais_agent_id"`
 	SessionID          types.String `tfsdk:"session_id"`
 	MachineID          types.String `tfsdk:"machine_id"`
+	TriggerMode        types.String `tfsdk:"trigger_mode"`
+	SessionType        types.String `tfsdk:"session_type"`
+	TimerEnabled       types.Bool   `tfsdk:"timer_enabled"`
+	TimerIntervalMs    types.Int64  `tfsdk:"timer_interval_ms"`
+	TimerMessage       types.String `tfsdk:"timer_message"`
 }
 
 func NewAgentResource() resource.Resource {
@@ -142,6 +147,30 @@ func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: "Sandbox/machine ID assigned to this agent.",
 				Computed:    true,
 			},
+			"trigger_mode": schema.StringAttribute{
+				Description: "Session trigger mode: autopilot (continuous), event (webhook/timer only), hybrid (both). Defaults to autopilot.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("autopilot"),
+			},
+			"session_type": schema.StringAttribute{
+				Description: "Session billing type: worker (billable compute) or communication (included in HITL). Defaults to worker.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("worker"),
+			},
+			"timer_enabled": schema.BoolAttribute{
+				Description: "Enable periodic timer trigger for this agent.",
+				Optional:    true,
+			},
+			"timer_interval_ms": schema.Int64Attribute{
+				Description: "Timer trigger interval in milliseconds (min 10000, max 86400000).",
+				Optional:    true,
+			},
+			"timer_message": schema.StringAttribute{
+				Description: "Message to enqueue when timer fires.",
+				Optional:    true,
+			},
 		},
 	}
 }
@@ -188,6 +217,11 @@ func (r *AgentResource) Create(ctx context.Context, req resource.CreateRequest, 
 		SubscriptionID:     plan.SubscriptionID.ValueString(),
 		ExistingAISAgentID: plan.ExistingAISAgentID.ValueString(),
 		Schedule:           &client.AgentSchedule{Shifts: []any{}, OffShift: "sleep"},
+		TriggerMode:        plan.TriggerMode.ValueString(),
+		SessionType:        plan.SessionType.ValueString(),
+		TimerEnabled:       boolPtrFromTF(plan.TimerEnabled),
+		TimerIntervalMs:    plan.TimerIntervalMs.ValueInt64(),
+		TimerMessage:       plan.TimerMessage.ValueString(),
 	}
 
 	agent, err := r.client.CreateAgent(ctx, createReq)
@@ -253,6 +287,11 @@ func (r *AgentResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		Email:             plan.Email.ValueString(),
 		DoneForNowEnabled: boolPtrFromTF(plan.DoneForNowEnabled),
 		SubscriptionID:    plan.SubscriptionID.ValueString(),
+		TriggerMode:       plan.TriggerMode.ValueString(),
+		SessionType:       plan.SessionType.ValueString(),
+		TimerEnabled:      boolPtrFromTF(plan.TimerEnabled),
+		TimerIntervalMs:   plan.TimerIntervalMs.ValueInt64(),
+		TimerMessage:      plan.TimerMessage.ValueString(),
 	}
 
 	agent, err := r.client.UpdateAgent(ctx, state.ID.ValueString(), updateReq)
@@ -355,5 +394,22 @@ func (r *AgentResource) mapAgentToState(agent *client.Agent, state *AgentResourc
 		state.MachineID = types.StringValue(agent.MachineID)
 	} else {
 		state.MachineID = types.StringNull()
+	}
+	if agent.TriggerMode != "" {
+		state.TriggerMode = types.StringValue(agent.TriggerMode)
+	}
+	if agent.SessionType != "" {
+		state.SessionType = types.StringValue(agent.SessionType)
+	}
+	if agent.TimerEnabled {
+		state.TimerEnabled = types.BoolValue(true)
+	} else if !state.TimerEnabled.IsNull() {
+		state.TimerEnabled = types.BoolValue(false)
+	}
+	if agent.TimerIntervalMs > 0 {
+		state.TimerIntervalMs = types.Int64Value(agent.TimerIntervalMs)
+	}
+	if agent.TimerMessage != "" {
+		state.TimerMessage = types.StringValue(agent.TimerMessage)
 	}
 }
