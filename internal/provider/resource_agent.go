@@ -42,7 +42,6 @@ type AgentResourceModel struct {
 	AISAgentID         types.String `tfsdk:"ais_agent_id"`
 	SessionID          types.String `tfsdk:"session_id"`
 	MachineID          types.String `tfsdk:"machine_id"`
-	TriggerMode        types.String `tfsdk:"trigger_mode"`
 	SessionType        types.String `tfsdk:"session_type"`
 	TimerEnabled       types.Bool   `tfsdk:"timer_enabled"`
 	TimerIntervalMs    types.Int64  `tfsdk:"timer_interval_ms"`
@@ -147,12 +146,6 @@ func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: "Sandbox/machine ID assigned to this agent.",
 				Computed:    true,
 			},
-			"trigger_mode": schema.StringAttribute{
-				Description: "Session trigger mode: autopilot (continuous), event (webhook/timer only), hybrid (both). Defaults to autopilot.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("autopilot"),
-			},
 			"session_type": schema.StringAttribute{
 				Description: "Session billing type: worker (billable compute) or communication (included in HITL). Defaults to worker.",
 				Optional:    true,
@@ -217,7 +210,6 @@ func (r *AgentResource) Create(ctx context.Context, req resource.CreateRequest, 
 		SubscriptionID:     plan.SubscriptionID.ValueString(),
 		ExistingAISAgentID: plan.ExistingAISAgentID.ValueString(),
 		Schedule:           &client.AgentSchedule{Shifts: []any{}, OffShift: "sleep"},
-		TriggerMode:        plan.TriggerMode.ValueString(),
 		SessionType:        plan.SessionType.ValueString(),
 		TimerEnabled:       boolPtrFromTF(plan.TimerEnabled),
 		TimerIntervalMs:    plan.TimerIntervalMs.ValueInt64(),
@@ -287,7 +279,6 @@ func (r *AgentResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		Email:             plan.Email.ValueString(),
 		DoneForNowEnabled: boolPtrFromTF(plan.DoneForNowEnabled),
 		SubscriptionID:    plan.SubscriptionID.ValueString(),
-		TriggerMode:       plan.TriggerMode.ValueString(),
 		SessionType:       plan.SessionType.ValueString(),
 		TimerEnabled:      boolPtrFromTF(plan.TimerEnabled),
 		TimerIntervalMs:   plan.TimerIntervalMs.ValueInt64(),
@@ -394,9 +385,6 @@ func (r *AgentResource) mapAgentToState(agent *client.Agent, state *AgentResourc
 		state.MachineID = types.StringValue(agent.MachineID)
 	} else {
 		state.MachineID = types.StringNull()
-	}
-	if agent.TriggerMode != "" {
-		state.TriggerMode = types.StringValue(agent.TriggerMode)
 	}
 	if agent.SessionType != "" {
 		state.SessionType = types.StringValue(agent.SessionType)

@@ -120,7 +120,6 @@ type Agent struct {
 	MachineID             string         `json:"machineId"`
 	AISAgentID            string         `json:"aisAgentId"`
 	OrchestratorSessionID string         `json:"orchestratorSessionId"`
-	TriggerMode           string         `json:"triggerMode"`
 	SessionType           string         `json:"sessionType"`
 	TimerEnabled          bool           `json:"timerEnabled"`
 	TimerIntervalMs       int64          `json:"timerIntervalMs"`
@@ -143,7 +142,6 @@ type CreateAgentRequest struct {
 	SubscriptionID     string         `json:"subscriptionId,omitempty"`
 	ExistingAISAgentID string         `json:"existingAisAgentId,omitempty"`
 	Schedule           *AgentSchedule `json:"schedule"`
-	TriggerMode        string         `json:"triggerMode,omitempty"`
 	SessionType        string         `json:"sessionType,omitempty"`
 	TimerEnabled       *bool          `json:"timerEnabled,omitempty"`
 	TimerIntervalMs    int64          `json:"timerIntervalMs,omitempty"`
@@ -162,7 +160,6 @@ type UpdateAgentRequest struct {
 	DoneForNowEnabled *bool          `json:"doneForNowEnabled,omitempty"`
 	SubscriptionID    string         `json:"subscriptionId,omitempty"`
 	Schedule          *AgentSchedule `json:"schedule,omitempty"`
-	TriggerMode       string         `json:"triggerMode,omitempty"`
 	SessionType       string         `json:"sessionType,omitempty"`
 	TimerEnabled      *bool          `json:"timerEnabled,omitempty"`
 	TimerIntervalMs   int64          `json:"timerIntervalMs,omitempty"`
