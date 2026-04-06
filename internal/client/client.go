@@ -149,21 +149,22 @@ type CreateAgentRequest struct {
 }
 
 type UpdateAgentRequest struct {
-	Name            string         `json:"name,omitempty"`
-	DisplayName     string         `json:"displayName,omitempty"`
-	Model           string         `json:"model,omitempty"`
-	ComputeClass    string         `json:"computeClass,omitempty"`
-	SystemPrompt    string         `json:"systemPrompt,omitempty"`
-	AutopilotPrompt string         `json:"autopilotPrompt,omitempty"`
-	Capabilities    []string       `json:"capabilities,omitempty"`
-	Email             string         `json:"email,omitempty"`
-	DoneForNowEnabled *bool          `json:"doneForNowEnabled,omitempty"`
-	SubscriptionID    string         `json:"subscriptionId,omitempty"`
-	Schedule          *AgentSchedule `json:"schedule,omitempty"`
-	SessionType       string         `json:"sessionType,omitempty"`
-	TimerEnabled      *bool          `json:"timerEnabled,omitempty"`
-	TimerIntervalMs   int64          `json:"timerIntervalMs,omitempty"`
-	TimerMessage      string         `json:"timerMessage,omitempty"`
+	Name               string         `json:"name,omitempty"`
+	DisplayName        string         `json:"displayName,omitempty"`
+	Model              string         `json:"model,omitempty"`
+	ComputeClass       string         `json:"computeClass,omitempty"`
+	SystemPrompt       string         `json:"systemPrompt,omitempty"`
+	AutopilotPrompt    string         `json:"autopilotPrompt,omitempty"`
+	Capabilities       []string       `json:"capabilities,omitempty"`
+	Email              string         `json:"email,omitempty"`
+	DoneForNowEnabled  *bool          `json:"doneForNowEnabled,omitempty"`
+	SubscriptionID     string         `json:"subscriptionId,omitempty"`
+	ExistingAISAgentID string         `json:"existingAisAgentId,omitempty"`
+	Schedule           *AgentSchedule `json:"schedule,omitempty"`
+	SessionType        string         `json:"sessionType,omitempty"`
+	TimerEnabled       *bool          `json:"timerEnabled,omitempty"`
+	TimerIntervalMs    int64          `json:"timerIntervalMs,omitempty"`
+	TimerMessage       string         `json:"timerMessage,omitempty"`
 }
 
 // AgentIdentity holds the AIS identity details for an agent.
