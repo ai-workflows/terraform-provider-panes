@@ -35,6 +35,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          install-mode: goinstall
 
   # Acceptance tests run against a real Panes API.
   # Only runs on main branch pushes with secrets configured.
