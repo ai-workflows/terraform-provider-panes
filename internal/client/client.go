@@ -103,6 +103,14 @@ type AgentSchedule struct {
 	OffShift string `json:"offShift"`
 }
 
+type AgentConfig struct {
+	SessionType      string `json:"sessionType"`
+	TimerEnabled     bool   `json:"timerEnabled"`
+	TimerIntervalMs  int64  `json:"timerIntervalMs"`
+	TimerMessage     string `json:"timerMessage"`
+	DoneForNowEnabled bool  `json:"doneForNowEnabled"`
+}
+
 type Agent struct {
 	ID                    string         `json:"id"`
 	Name                  string         `json:"name"`
@@ -120,6 +128,8 @@ type Agent struct {
 	MachineID             string         `json:"machineId"`
 	AISAgentID            string         `json:"aisAgentId"`
 	OrchestratorSessionID string         `json:"orchestratorSessionId"`
+	Config                *AgentConfig   `json:"config"`
+	// Top-level fields kept for backward compat with create/update requests
 	SessionType           string         `json:"sessionType"`
 	TimerEnabled          bool           `json:"timerEnabled"`
 	TimerIntervalMs       int64          `json:"timerIntervalMs"`

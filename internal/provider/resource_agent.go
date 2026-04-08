@@ -387,18 +387,37 @@ func (r *AgentResource) mapAgentToState(agent *client.Agent, state *AgentResourc
 	} else {
 		state.MachineID = types.StringNull()
 	}
-	if agent.SessionType != "" {
-		state.SessionType = types.StringValue(agent.SessionType)
+	// Read timer/session fields from config (API nests them there) or top-level
+	sessionType := agent.SessionType
+	timerEnabled := agent.TimerEnabled
+	timerIntervalMs := agent.TimerIntervalMs
+	timerMessage := agent.TimerMessage
+	if agent.Config != nil {
+		if agent.Config.SessionType != "" {
+			sessionType = agent.Config.SessionType
+		}
+		if agent.Config.TimerEnabled {
+			timerEnabled = true
+		}
+		if agent.Config.TimerIntervalMs > 0 {
+			timerIntervalMs = agent.Config.TimerIntervalMs
+		}
+		if agent.Config.TimerMessage != "" {
+			timerMessage = agent.Config.TimerMessage
+		}
 	}
-	if agent.TimerEnabled {
+	if sessionType != "" {
+		state.SessionType = types.StringValue(sessionType)
+	}
+	if timerEnabled {
 		state.TimerEnabled = types.BoolValue(true)
 	} else if !state.TimerEnabled.IsNull() {
 		state.TimerEnabled = types.BoolValue(false)
 	}
-	if agent.TimerIntervalMs > 0 {
-		state.TimerIntervalMs = types.Int64Value(agent.TimerIntervalMs)
+	if timerIntervalMs > 0 {
+		state.TimerIntervalMs = types.Int64Value(timerIntervalMs)
 	}
-	if agent.TimerMessage != "" {
-		state.TimerMessage = types.StringValue(agent.TimerMessage)
+	if timerMessage != "" {
+		state.TimerMessage = types.StringValue(timerMessage)
 	}
 }
