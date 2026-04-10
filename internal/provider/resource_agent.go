@@ -128,8 +128,9 @@ func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Optional:    true,
 			},
 			"existing_ais_agent_id": schema.StringAttribute{
-				Description: "Existing AIS agent ID to reuse identity/credentials from. If omitted, a new identity is created.",
-				Optional:    true,
+				Description:        "Existing AIS agent ID to reuse identity/credentials from. If omitted, a new identity is created.",
+				DeprecationMessage: "Use panes_ais_account and panes_ais_account_link resources instead to manage agent identity and credentials.",
+				Optional:           true,
 			},
 			"ais_agent_id": schema.StringAttribute{
 				Description: "AIS agent ID (auto-assigned on create, or set via existing_ais_agent_id).",

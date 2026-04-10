@@ -424,3 +424,95 @@ func (c *Client) WaitForSandbox(ctx context.Context, id string, timeout time.Dur
 	}
 	return nil, fmt.Errorf("sandbox did not become ready within %s", timeout)
 }
+
+// --- AIS Account types ---
+
+type AISAccount struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	ProviderType string `json:"providerType"`
+	Description  string `json:"description"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
+}
+
+type CreateAISAccountRequest struct {
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	ProviderType string `json:"providerType"`
+	Description  string `json:"description,omitempty"`
+}
+
+type UpdateAISAccountRequest struct {
+	Name         string `json:"name,omitempty"`
+	Slug         string `json:"slug,omitempty"`
+	ProviderType string `json:"providerType,omitempty"`
+	Description  string `json:"description,omitempty"`
+}
+
+func (c *Client) CreateAISAccount(ctx context.Context, req CreateAISAccountRequest) (*AISAccount, error) {
+	var resp AISAccount
+	if err := c.do(ctx, http.MethodPost, "/api/v1/admin/accounts", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *Client) GetAISAccount(ctx context.Context, id string) (*AISAccount, error) {
+	var resp AISAccount
+	if err := c.do(ctx, http.MethodGet, "/api/v1/admin/accounts/"+id, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *Client) UpdateAISAccount(ctx context.Context, id string, req UpdateAISAccountRequest) (*AISAccount, error) {
+	var resp AISAccount
+	if err := c.do(ctx, http.MethodPatch, "/api/v1/admin/accounts/"+id, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *Client) DeleteAISAccount(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/api/v1/admin/accounts/"+id, nil, nil)
+}
+
+// --- AIS Account Link types ---
+
+type AISAccountLink struct {
+	ID          string   `json:"id"`
+	AgentID     string   `json:"agentId"`
+	AccountID   string   `json:"accountId"`
+	Permissions []string `json:"permissions"`
+	CreatedAt   string   `json:"createdAt"`
+	UpdatedAt   string   `json:"updatedAt"`
+}
+
+type CreateAISAccountLinkRequest struct {
+	AgentID     string   `json:"agentId"`
+	AccountID   string   `json:"accountId"`
+	Permissions []string `json:"permissions"`
+}
+
+func (c *Client) CreateAISAccountLink(ctx context.Context, req CreateAISAccountLinkRequest) (*AISAccountLink, error) {
+	var resp AISAccountLink
+	if err := c.do(ctx, http.MethodPost, "/api/v1/admin/account-links", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *Client) GetAISAccountLink(ctx context.Context, id string) (*AISAccountLink, error) {
+	var resp AISAccountLink
+	if err := c.do(ctx, http.MethodGet, "/api/v1/admin/account-links/"+id, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *Client) DeleteAISAccountLink(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/api/v1/admin/account-links/"+id, nil, nil)
+}
