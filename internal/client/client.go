@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -43,6 +44,10 @@ func (e *APIError) Error() string {
 
 func (e *APIError) IsNotFound() bool {
 	return e.StatusCode == 404
+}
+
+func (e *APIError) IsAlreadyRunning() bool {
+	return e.StatusCode == http.StatusBadRequest && strings.Contains(strings.ToLower(e.Message), "already running")
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body any, result any) error {
@@ -104,11 +109,11 @@ type AgentSchedule struct {
 }
 
 type AgentConfig struct {
-	SessionType      string `json:"sessionType"`
-	TimerEnabled     bool   `json:"timerEnabled"`
-	TimerIntervalMs  int64  `json:"timerIntervalMs"`
-	TimerMessage     string `json:"timerMessage"`
-	DoneForNowEnabled bool  `json:"doneForNowEnabled"`
+	SessionType       string `json:"sessionType"`
+	TimerEnabled      bool   `json:"timerEnabled"`
+	TimerIntervalMs   int64  `json:"timerIntervalMs"`
+	TimerMessage      string `json:"timerMessage"`
+	DoneForNowEnabled bool   `json:"doneForNowEnabled"`
 }
 
 type Agent struct {
@@ -130,12 +135,12 @@ type Agent struct {
 	OrchestratorSessionID string         `json:"orchestratorSessionId"`
 	Config                *AgentConfig   `json:"config"`
 	// Top-level fields kept for backward compat with create/update requests
-	SessionType           string         `json:"sessionType"`
-	TimerEnabled          bool           `json:"timerEnabled"`
-	TimerIntervalMs       int64          `json:"timerIntervalMs"`
-	TimerMessage          string         `json:"timerMessage"`
-	CreatedAt             string         `json:"createdAt"`
-	UpdatedAt             string         `json:"updatedAt"`
+	SessionType     string `json:"sessionType"`
+	TimerEnabled    bool   `json:"timerEnabled"`
+	TimerIntervalMs int64  `json:"timerIntervalMs"`
+	TimerMessage    string `json:"timerMessage"`
+	CreatedAt       string `json:"createdAt"`
+	UpdatedAt       string `json:"updatedAt"`
 }
 
 type CreateAgentRequest struct {
@@ -179,9 +184,9 @@ type UpdateAgentRequest struct {
 
 // AgentIdentity holds the AIS identity details for an agent.
 type AgentIdentity struct {
-	AISAgentID  string              `json:"aisAgentId"`
-	Identity    *AgentIdentityInfo  `json:"identity"`
-	Credentials []AgentCredential   `json:"credentials"`
+	AISAgentID  string             `json:"aisAgentId"`
+	Identity    *AgentIdentityInfo `json:"identity"`
+	Credentials []AgentCredential  `json:"credentials"`
 }
 
 type AgentIdentityInfo struct {
