@@ -100,8 +100,17 @@ func (r *AgentInstanceResource) Create(ctx context.Context, req resource.CreateR
 
 	agent, err := r.client.StartAgent(ctx, agentID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error starting agent", err.Error())
-		return
+		if apiErr, ok := err.(*client.APIError); ok && apiErr.IsAlreadyRunning() {
+			tflog.Info(ctx, "Agent already running, adopting current state", map[string]any{"agent_id": agentID})
+			agent, err = r.client.GetAgent(ctx, agentID)
+			if err != nil {
+				resp.Diagnostics.AddError("Error reading already-running agent", err.Error())
+				return
+			}
+		} else {
+			resp.Diagnostics.AddError("Error starting agent", err.Error())
+			return
+		}
 	}
 
 	plan.ID = types.StringValue(agent.ID)
