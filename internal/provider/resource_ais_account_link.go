@@ -119,12 +119,16 @@ func (r *AISAccountLinkResource) Configure(_ context.Context, req resource.Confi
 	if req.ProviderData == nil {
 		return
 	}
-	c, ok := req.ProviderData.(*client.Client)
+	pd, ok := req.ProviderData.(*ProviderClients)
 	if !ok {
-		resp.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *client.Client, got: %T", req.ProviderData))
+		resp.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *ProviderClients, got: %T", req.ProviderData))
 		return
 	}
-	r.client = c
+	if pd.Panes == nil {
+		resp.Diagnostics.AddError("Panes client not configured", "Set PANES_TOKEN (or token = ...) to manage panes_ais_account_link resources.")
+		return
+	}
+	r.client = pd.Panes
 }
 
 func (r *AISAccountLinkResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
