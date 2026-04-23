@@ -147,6 +147,14 @@ func (c *FleetClient) CreateEngagement(ctx context.Context, req CreateEngagement
 	return &resp, nil
 }
 
+func (c *FleetClient) ListEngagements(ctx context.Context) ([]Engagement, error) {
+	var resp []Engagement
+	if err := c.do(ctx, http.MethodGet, "/api/teams", nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (c *FleetClient) GetEngagement(ctx context.Context, id string) (*Engagement, error) {
 	var resp Engagement
 	if err := c.do(ctx, http.MethodGet, "/api/teams/"+id, nil, &resp); err != nil {
