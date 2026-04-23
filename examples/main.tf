@@ -7,8 +7,28 @@ terraform {
 }
 
 provider "panes" {
-  # api_url defaults to https://app.a9s.dev
-  # token from PANES_TOKEN env var
+  # Panes (agents/sandboxes/subscriptions):
+  #   api_url defaults to https://panes.infra.aiworkflows.com
+  #   token from PANES_TOKEN env var
+  #
+  # Fleet (engagements):
+  #   fleet_api_url defaults to https://api.fleet.build
+  #   fleet_token from FLEET_TOKEN env var (portal-compatible JWT)
+}
+
+# --- Engagement (managed by Fleet) ---
+
+resource "panes_engagement" "meridian" {
+  name               = "meridian"
+  mode               = "standard"
+  slack_channel_name = "meridian"
+
+  agents = [
+    { role = "builder", count = 2 },
+    { role = "qa", count = 1 },
+  ]
+
+  github_repos = ["acme/web", "acme/api"]
 }
 
 # --- Subscription (created and authed via Panes UI) ---
