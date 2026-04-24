@@ -156,5 +156,6 @@ func (p *PanesProvider) DataSources(_ context.Context) []func() datasource.DataS
 	return []func() datasource.DataSource{
 		NewSubscriptionDataSource,
 		NewEngagementDataSource,
+		NewAISAccountDataSource,
 	}
 }

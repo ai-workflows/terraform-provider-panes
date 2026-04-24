@@ -473,6 +473,21 @@ func (c *Client) GetAISAccount(ctx context.Context, id string) (*AISAccount, err
 	return &resp, nil
 }
 
+// ListAISAccounts returns accounts for an org (required filter). Used by the
+// panes_ais_account data source for lookup-by-slug without requiring Terraform
+// to know the account id up-front.
+func (c *Client) ListAISAccounts(ctx context.Context, orgID string) ([]AISAccount, error) {
+	path := "/api/v1/admin/accounts"
+	if orgID != "" {
+		path += "?orgId=" + orgID
+	}
+	var resp []AISAccount
+	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (c *Client) UpdateAISAccount(ctx context.Context, id string, req UpdateAISAccountRequest) (*AISAccount, error) {
 	var resp AISAccount
 	if err := c.do(ctx, http.MethodPatch, "/api/v1/admin/accounts/"+id, req, &resp); err != nil {
