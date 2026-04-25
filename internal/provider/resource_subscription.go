@@ -42,6 +42,7 @@ func (r *SubscriptionResource) Metadata(_ context.Context, req resource.Metadata
 func (r *SubscriptionResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Panes LLM subscription (e.g. ChatGPT account for agent inference).",
+		DeprecationMessage: "subscription ownership has moved from Panes to proxy-router. Onboarding, provisioning, auth upload, and status changes are now operator-driven via `pnpm cli add-account` against proxy-router; the Panes /api/subscriptions write endpoints have been removed. Use the `panes_subscription` data source to look up an existing seat. This resource will be removed in a future release. See ai-workflows/docs#10 Phase 5 + ai-workflows/docs#18.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "Subscription ID.",
