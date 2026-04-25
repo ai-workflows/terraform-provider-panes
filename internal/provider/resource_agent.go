@@ -58,7 +58,8 @@ func (r *AgentResource) Metadata(_ context.Context, req resource.MetadataRequest
 
 func (r *AgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Panes AI agent.",
+		Description: "Manages a Panes AI agent. DEPRECATED: use the fleet provider's `fleet_engagement` + agent-module resources instead — agent ownership moved from Panes to Fleet/Orchestrator in Phase 3 of the platform migration (ai-workflows/docs#10). This resource stays functional during the deprecation window but will be removed in Phase 6.",
+		DeprecationMessage: "agent ownership has moved from Panes to Fleet/Orchestrator. Migrate to the fleet provider's engagement/agent resources; see ai-workflows/docs#10 Phase 2 + Phase 6. This resource will be removed in a future release.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "Agent ID.",

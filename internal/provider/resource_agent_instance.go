@@ -44,7 +44,8 @@ func (r *AgentInstanceResource) Metadata(_ context.Context, req resource.Metadat
 
 func (r *AgentInstanceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a running agent instance. Creating this resource starts the agent; destroying it stops the agent and cleans up its sandbox.",
+		Description:        "Manages a running agent instance. DEPRECATED alongside panes_agent — Orchestrator now owns the agent lifecycle (Phase 3 of ai-workflows/docs#10). Stays functional in the deprecation window; removal is Phase 6.",
+		DeprecationMessage: "agent lifecycle moved from Panes to Orchestrator. Migrate to the fleet provider's engagement/agent resources; see ai-workflows/docs#10 Phase 2 + Phase 6. This resource will be removed in a future release.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "Same as agent_id (agent instances are 1:1 with agents).",
