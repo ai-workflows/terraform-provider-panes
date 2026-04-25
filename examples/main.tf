@@ -14,6 +14,13 @@ provider "panes" {
   # Fleet (engagements):
   #   fleet_api_url defaults to https://api.fleet.build
   #   fleet_token from FLEET_TOKEN env var (portal-compatible JWT)
+  #
+  # Orchestrator (panes_managed_agent — non-deprecated path for standing internal agents):
+  #   orchestrator_url from ORCHESTRATOR_URL env var (no default — varies by env)
+  #   Either:
+  #     orchestrator_token from ORCHESTRATOR_TOKEN env var (pre-minted service JWT, no refresh)
+  #   Or:
+  #     orchestrator_client_id + orchestrator_client_secret (OAuth2 client_credentials, JWT refreshed automatically)
 }
 
 # --- Engagement (managed by Fleet) ---
@@ -96,4 +103,28 @@ output "qa_status" {
 
 output "specialist_status" {
   value = panes_agent_instance.runtime_specialist.status
+}
+
+# --- Standing internal agent (non-deprecated path) ---
+#
+# panes_managed_agent talks to Orchestrator directly. Use this for agents
+# that don't fit Fleet's engagement-shaped model — internal SRE bots,
+# monitoring agents, fleet-management agents, etc.
+
+resource "panes_managed_agent" "sre" {
+  name             = "sre"
+  display_name     = "SRE Agent"
+  role             = "sre"
+  model            = "alias:default"
+  compute_class    = "standard"
+  system_prompt    = file("prompts/sre-system.md")
+  autopilot_prompt = file("prompts/sre-autopilot.md")
+  subscription_id  = data.panes_subscription.chatgpt_pro.id
+
+  # Optional: pin to an existing AIS identity (otherwise orchestrator mints one).
+  # ais_agent_id = panes_ais_account.sre_identity.id
+}
+
+output "sre_status" {
+  value = panes_managed_agent.sre.status
 }
