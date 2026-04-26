@@ -21,6 +21,7 @@ type ProviderClients struct {
 	Fleet        *client.FleetClient
 	Orchestrator *client.OrchestratorClient
 	AIS          *client.AISClient
+	ProxyRouter  *client.ProxyRouterClient
 }
 
 type PanesProvider struct {
@@ -40,6 +41,7 @@ type PanesProviderModel struct {
 	OrchestratorClientSecret  types.String `tfsdk:"orchestrator_client_secret"`
 	AISAPIURL                 types.String `tfsdk:"ais_api_url"`
 	AISAdminToken             types.String `tfsdk:"ais_admin_token"`
+	ProxyRouterURL            types.String `tfsdk:"proxy_router_url"`
 }
 
 func New(version string) func() provider.Provider {
@@ -109,6 +111,10 @@ func (p *PanesProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 				Description: "AIS admin token (Bearer). Provisioned via auth-service or stored in GSM as ais-staging-admin-token / ais-prod-admin-token. Can also be set with AIS_ADMIN_TOKEN.",
 				Optional:    true,
 				Sensitive:   true,
+			},
+			"proxy_router_url": schema.StringAttribute{
+				Description: "Proxy-router service URL (for the panes_subscription data source). Used to look up seat inventory directly instead of going through the Panes /api/subscriptions façade. Can also be set with PROXY_ROUTER_URL. When the URL ends in .run.app, the client mints a Google ID token via the GCE metadata server for Cloud Run IAM auth.",
+				Optional:    true,
 			},
 		},
 	}
@@ -222,15 +228,32 @@ func (p *PanesProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		aisClient = client.NewAIS(aisURL, aisToken, orgID)
 	}
 
-	if panesClient == nil && fleetClient == nil && orchClient == nil && aisClient == nil {
+	// ---------- Proxy-router client (for panes_subscription data source) ----------
+	proxyURL := os.Getenv("PROXY_ROUTER_URL")
+	if !config.ProxyRouterURL.IsNull() {
+		proxyURL = config.ProxyRouterURL.ValueString()
+	}
+
+	var proxyClient *client.ProxyRouterClient
+	if proxyURL != "" {
+		proxyClient = client.NewProxyRouter(proxyURL)
+	}
+
+	if panesClient == nil && fleetClient == nil && orchClient == nil && aisClient == nil && proxyClient == nil {
 		resp.Diagnostics.AddError(
 			"No provider tokens configured",
-			"At least one of PANES_TOKEN, FLEET_TOKEN, ORCHESTRATOR_TOKEN/ORCHESTRATOR_CLIENT_ID+SECRET, or AIS_ADMIN_TOKEN must be provided.",
+			"At least one of PANES_TOKEN, FLEET_TOKEN, ORCHESTRATOR_TOKEN/ORCHESTRATOR_CLIENT_ID+SECRET, AIS_ADMIN_TOKEN, or PROXY_ROUTER_URL must be provided.",
 		)
 		return
 	}
 
-	clients := &ProviderClients{Panes: panesClient, Fleet: fleetClient, Orchestrator: orchClient, AIS: aisClient}
+	clients := &ProviderClients{
+		Panes:        panesClient,
+		Fleet:        fleetClient,
+		Orchestrator: orchClient,
+		AIS:          aisClient,
+		ProxyRouter:  proxyClient,
+	}
 	resp.DataSourceData = clients
 	resp.ResourceData = clients
 }
