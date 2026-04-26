@@ -203,32 +203,41 @@ func (c *OrchestratorClient) do(ctx context.Context, method, path string, body, 
 // --- Managed agent types ---
 
 // ManagedAgent mirrors the orchestrator's managed_agents row.
-// Field tags are snake_case to match orchestrator's API convention.
+//
+// Wire format note: orchestrator's REST API uses snake_case in REQUEST
+// bodies (matching the Zod schemas in routes/managed-agents.ts) but
+// camelCase in RESPONSE bodies (orchestrator's AgentStore returns
+// internal camelCase representations directly via res.json). Hence each
+// field carries two tags — `read:` is consulted on unmarshal, but Go's
+// encoding/json doesn't support directional tags. Workaround: mark the
+// JSON tag as the response form (camelCase) and use a separate
+// CreateManagedAgentRequest / UpdateManagedAgentRequest struct with
+// snake_case for outgoing payloads.
 type ManagedAgent struct {
 	ID                    string                 `json:"id"`
-	OrgID                 string                 `json:"org_id,omitempty"`
-	EngagementID          string                 `json:"engagement_id,omitempty"`
-	UserID                string                 `json:"user_id,omitempty"`
-	TemplateID            string                 `json:"template_id,omitempty"`
+	OrgID                 string                 `json:"orgId,omitempty"`
+	EngagementID          string                 `json:"engagementId,omitempty"`
+	UserID                string                 `json:"userId,omitempty"`
+	TemplateID            string                 `json:"templateId,omitempty"`
 	Name                  string                 `json:"name"`
-	DisplayName           string                 `json:"display_name,omitempty"`
+	DisplayName           string                 `json:"displayName,omitempty"`
 	Role                  string                 `json:"role,omitempty"`
 	Model                 string                 `json:"model,omitempty"`
-	ComputeClass          string                 `json:"compute_class,omitempty"`
-	SystemPrompt          string                 `json:"system_prompt,omitempty"`
-	AutopilotPrompt       string                 `json:"autopilot_prompt,omitempty"`
+	ComputeClass          string                 `json:"computeClass,omitempty"`
+	SystemPrompt          string                 `json:"systemPrompt,omitempty"`
+	AutopilotPrompt       string                 `json:"autopilotPrompt,omitempty"`
 	Status                string                 `json:"status,omitempty"`
 	Intent                string                 `json:"intent,omitempty"`
-	SubscriptionID        string                 `json:"subscription_id,omitempty"`
-	MachineID             string                 `json:"machine_id,omitempty"`
-	OrchestratorSessionID string                 `json:"orchestrator_session_id,omitempty"`
-	AISAgentID            string                 `json:"ais_agent_id,omitempty"`
+	SubscriptionID        string                 `json:"subscriptionId,omitempty"`
+	MachineID             string                 `json:"machineId,omitempty"`
+	OrchestratorSessionID string                 `json:"orchestratorSessionId,omitempty"`
+	AISAgentID            string                 `json:"aisAgentId,omitempty"`
 	Config                map[string]interface{} `json:"config,omitempty"`
-	ErrorMessage          string                 `json:"error_message,omitempty"`
+	ErrorMessage          string                 `json:"errorMessage,omitempty"`
 }
 
 // CreateManagedAgentRequest matches the createAgentSchema in
-// orchestrator/packages/service/src/routes/managed-agents.ts.
+// orchestrator/packages/service/src/routes/managed-agents.ts (snake_case).
 type CreateManagedAgentRequest struct {
 	ID              string                 `json:"id,omitempty"`
 	OrgID           string                 `json:"org_id,omitempty"`
