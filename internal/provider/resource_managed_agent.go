@@ -62,6 +62,21 @@ func (r *ManagedAgentResource) Metadata(_ context.Context, req resource.Metadata
 	resp.TypeName = req.ProviderTypeName + "_managed_agent"
 }
 
+// optionalComputedString builds a typical "user can set, but provider may fill
+// in too" attribute. Using UseStateForUnknown means the planned value carries
+// over from the prior state when the user doesn't set the attribute, which
+// matches Optional+Computed semantics in nearly every TF provider.
+func optionalComputedString(description string) schema.StringAttribute {
+	return schema.StringAttribute{
+		Description: description,
+		Optional:    true,
+		Computed:    true,
+		PlanModifiers: []planmodifier.String{
+			stringplanmodifier.UseStateForUnknown(),
+		},
+	}
+}
+
 func (r *ManagedAgentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a single managed-agent record in Orchestrator. The non-deprecated successor to panes_agent for standing internal agents (sre/fleet/monitoring/etc.) that don't fit Fleet's engagement-shaped model. Manages config only — runtime lifecycle (start/stop) is operational and lives outside Terraform.",
@@ -73,74 +88,23 @@ func (r *ManagedAgentResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"org_id": schema.StringAttribute{
-				Description: "Organization ID this agent belongs to. Defaults to the provider's org_id.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"engagement_id": schema.StringAttribute{
-				Description: "Engagement ID, if this agent belongs to an engagement. Standing internal agents leave this null.",
-				Optional:    true,
-			},
-			"user_id": schema.StringAttribute{
-				Description: "Owning user ID.",
-				Optional:    true,
-			},
-			"template_id": schema.StringAttribute{
-				Description: "Agent template (developer-engineer, devops-sre, project-manager, custom).",
-				Optional:    true,
-			},
+			"org_id":           optionalComputedString("Organization ID this agent belongs to. Defaults to the provider's org_id."),
+			"engagement_id":    optionalComputedString("Engagement ID, if this agent belongs to an engagement. Standing internal agents leave this null."),
+			"user_id":          optionalComputedString("Owning user ID. Often populated by orchestrator from the JWT subject."),
+			"template_id":      optionalComputedString("Agent template (developer-engineer, devops-sre, project-manager, custom)."),
 			"name": schema.StringAttribute{
 				Description: "Agent name (identifier).",
 				Required:    true,
 			},
-			"display_name": schema.StringAttribute{
-				Description: "Human-readable display name.",
-				Optional:    true,
-			},
-			"role": schema.StringAttribute{
-				Description: "Agent role (e.g. builder, comms, sre).",
-				Optional:    true,
-			},
-			"model": schema.StringAttribute{
-				Description: "Model identifier (e.g. chatgpt:gpt-5.4, alias:default).",
-				Optional:    true,
-			},
-			"compute_class": schema.StringAttribute{
-				Description: "Sandbox compute class (e.g. standard, standard-2, performance).",
-				Optional:    true,
-			},
-			"system_prompt": schema.StringAttribute{
-				Description: "System prompt that defines the agent's role and identity.",
-				Optional:    true,
-			},
-			"autopilot_prompt": schema.StringAttribute{
-				Description: "Autopilot prompt that defines the agent's autonomous workflow.",
-				Optional:    true,
-			},
-			"intent": schema.StringAttribute{
-				Description: "Agent intent (e.g. run, stop). Defaults to stop.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"subscription_id": schema.StringAttribute{
-				Description: "ChatGPT/proxy-router subscription ID to pin this agent to. Use data.panes_subscription to look up.",
-				Optional:    true,
-			},
-			"ais_agent_id": schema.StringAttribute{
-				Description: "AIS agent identity. Set on create to link to an existing AIS identity, or read on subsequent applies.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
+			"display_name":     optionalComputedString("Human-readable display name."),
+			"role":             optionalComputedString("Agent role (e.g. builder, comms, sre)."),
+			"model":            optionalComputedString("Model identifier (e.g. chatgpt:gpt-5.4, alias:default)."),
+			"compute_class":    optionalComputedString("Sandbox compute class (e.g. standard, standard-2, performance)."),
+			"system_prompt":    optionalComputedString("System prompt that defines the agent's role and identity."),
+			"autopilot_prompt": optionalComputedString("Autopilot prompt that defines the agent's autonomous workflow."),
+			"intent":           optionalComputedString("Agent intent (e.g. run, stop). Defaults to stop."),
+			"subscription_id":  optionalComputedString("ChatGPT/proxy-router subscription ID to pin this agent to. Use data.panes_subscription to look up."),
+			"ais_agent_id":     optionalComputedString("AIS agent identity. Set on create to link to an existing AIS identity, or read on subsequent applies."),
 			"status": schema.StringAttribute{
 				Description: "Current status (running, sleeping, paused, stopped, error). Read-only.",
 				Computed:    true,
