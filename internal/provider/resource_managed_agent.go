@@ -200,9 +200,17 @@ func (r *ManagedAgentResource) Create(ctx context.Context, req resource.CreateRe
 		AISAgentID:      plan.AISAgentID.ValueString(),
 	}
 
-	agent, err := r.client.CreateManagedAgent(ctx, createReq)
+	created, err := r.client.CreateManagedAgent(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating managed agent", err.Error())
+		return
+	}
+
+	// Re-GET to populate state with the full record (orchestrator's create
+	// response can be partial — same reason Update re-GETs).
+	agent, err := r.client.GetManagedAgent(ctx, created.ID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading managed agent after create", err.Error())
 		return
 	}
 
@@ -256,9 +264,19 @@ func (r *ManagedAgentResource) Update(ctx context.Context, req resource.UpdateRe
 		AISAgentID:      stringPtr(plan.AISAgentID),
 	}
 
-	agent, err := r.client.UpdateManagedAgent(ctx, state.ID.ValueString(), updateReq)
-	if err != nil {
+	if _, err := r.client.UpdateManagedAgent(ctx, state.ID.ValueString(), updateReq); err != nil {
 		resp.Diagnostics.AddError("Error updating managed agent", err.Error())
+		return
+	}
+
+	// Re-GET to populate state with the full record. The orchestrator's PATCH
+	// response only includes fields that changed, so relying on it directly
+	// would null out unchanged Optional+Computed attributes (template_id,
+	// compute_class, ais_agent_id, etc.) and trip TF's "provider produced
+	// inconsistent result after apply" check.
+	agent, err := r.client.GetManagedAgent(ctx, state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading managed agent after update", err.Error())
 		return
 	}
 
