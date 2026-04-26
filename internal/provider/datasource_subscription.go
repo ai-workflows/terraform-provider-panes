@@ -12,8 +12,20 @@ import (
 
 var _ datasource.DataSource = &SubscriptionDataSource{}
 
+// SubscriptionDataSource looks up a ChatGPT seat by ID or label.
+//
+// Originally this called Panes's /api/subscriptions endpoint, which was
+// itself a read-only façade over proxy-router's /api/v1/accounts. The
+// indirection was a holdover from the seat-pool migration; it added an
+// extra hop and a Panes dependency for no reason. tfprov#23 cut it out:
+// the data source now calls proxy-router directly via the
+// `proxy_router_url` provider config.
+//
+// The data shape, attribute names, and semantics are unchanged so
+// existing consumers (sre/fleet/monitoring/portal/platform-eng + live
+// engagement repos) work without changes.
 type SubscriptionDataSource struct {
-	client *client.Client
+	client *client.ProxyRouterClient
 }
 
 type SubscriptionDataSourceModel struct {
@@ -34,15 +46,15 @@ func (d *SubscriptionDataSource) Metadata(_ context.Context, req datasource.Meta
 
 func (d *SubscriptionDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Look up a ChatGPT subscription by ID or label. Subscriptions are created and authenticated via the Panes UI.",
+		Description: "Look up a ChatGPT seat from proxy-router by ID or label. Seats are created and authenticated via the proxy-router CLI (`pnpm cli add-account`); this data source is read-only.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "Subscription ID. Specify either id or label.",
+				Description: "Account ID (UUID). Specify either id or label.",
 				Optional:    true,
 				Computed:    true,
 			},
 			"label": schema.StringAttribute{
-				Description: "Subscription label. Specify either id or label.",
+				Description: "Account label (e.g. `sub-6e1b8344`). Specify either id or label.",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -51,11 +63,11 @@ func (d *SubscriptionDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 				Computed:    true,
 			},
 			"plan_tier": schema.StringAttribute{
-				Description: "Subscription plan tier (e.g. pro, plus).",
+				Description: "Plan tier (e.g. pro, plus).",
 				Computed:    true,
 			},
 			"status": schema.StringAttribute{
-				Description: "Subscription status (active, pending_auth, rate_limited, disabled).",
+				Description: "Account status (active, pending_auth, expired, disabled).",
 				Computed:    true,
 			},
 		},
@@ -71,11 +83,14 @@ func (d *SubscriptionDataSource) Configure(_ context.Context, req datasource.Con
 		resp.Diagnostics.AddError("Unexpected Data Source Configure Type", fmt.Sprintf("Expected *ProviderClients, got: %T", req.ProviderData))
 		return
 	}
-	if pd.Panes == nil {
-		resp.Diagnostics.AddError("Panes client not configured", "Set PANES_TOKEN (or token = ...) to use panes_subscription data source.")
+	if pd.ProxyRouter == nil {
+		resp.Diagnostics.AddError(
+			"proxy-router client not configured",
+			"Set proxy_router_url on the provider block (or PROXY_ROUTER_URL env var) to use the panes_subscription data source. Earlier versions routed this through PANES_TOKEN; that path was retired in tfprov#23.",
+		)
 		return
 	}
-	d.client = pd.Panes
+	d.client = pd.ProxyRouter
 }
 
 func (d *SubscriptionDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -85,42 +100,42 @@ func (d *SubscriptionDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	subs, err := d.client.ListSubscriptions(ctx)
+	accounts, err := d.client.ListAccounts(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Error listing subscriptions", err.Error())
+		resp.Diagnostics.AddError("Error listing proxy-router accounts", err.Error())
 		return
 	}
 
-	var match *client.Subscription
+	var match *client.ProxyRouterAccount
 
 	if !config.ID.IsNull() && config.ID.ValueString() != "" {
-		for i := range subs {
-			if subs[i].ID == config.ID.ValueString() {
-				match = &subs[i]
+		for i := range accounts {
+			if accounts[i].ID == config.ID.ValueString() {
+				match = &accounts[i]
 				break
 			}
 		}
 	} else if !config.Label.IsNull() && config.Label.ValueString() != "" {
-		for i := range subs {
-			if subs[i].Label == config.Label.ValueString() {
-				match = &subs[i]
+		for i := range accounts {
+			if accounts[i].Label == config.Label.ValueString() {
+				match = &accounts[i]
 				break
 			}
 		}
 	} else {
-		resp.Diagnostics.AddError("Missing filter", "Specify either id or label to look up a subscription.")
+		resp.Diagnostics.AddError("Missing filter", "Specify either id or label to look up a seat.")
 		return
 	}
 
 	if match == nil {
-		resp.Diagnostics.AddError("Subscription not found", "No subscription matched the given id or label.")
+		resp.Diagnostics.AddError("Subscription not found", "No proxy-router account matched the given id or label.")
 		return
 	}
 
 	config.ID = types.StringValue(match.ID)
 	config.Label = types.StringValue(match.Label)
 	config.Provider = types.StringValue(match.Provider)
-	config.PlanTier = types.StringValue(match.PlanTier)
+	config.PlanTier = types.StringValue(match.Tier)
 	config.Status = types.StringValue(match.Status)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
