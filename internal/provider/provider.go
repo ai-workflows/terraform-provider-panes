@@ -20,6 +20,7 @@ type ProviderClients struct {
 	Panes        *client.Client
 	Fleet        *client.FleetClient
 	Orchestrator *client.OrchestratorClient
+	AIS          *client.AISClient
 }
 
 type PanesProvider struct {
@@ -37,6 +38,8 @@ type PanesProviderModel struct {
 	OrchestratorAuthURL       types.String `tfsdk:"orchestrator_auth_url"`
 	OrchestratorClientID      types.String `tfsdk:"orchestrator_client_id"`
 	OrchestratorClientSecret  types.String `tfsdk:"orchestrator_client_secret"`
+	AISAPIURL                 types.String `tfsdk:"ais_api_url"`
+	AISAdminToken             types.String `tfsdk:"ais_admin_token"`
 }
 
 func New(version string) func() provider.Provider {
@@ -95,6 +98,15 @@ func (p *PanesProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 			},
 			"orchestrator_client_secret": schema.StringAttribute{
 				Description: "OAuth2 client_secret for minting Orchestrator service JWTs. Can also be set with ORCHESTRATOR_CLIENT_SECRET.",
+				Optional:    true,
+				Sensitive:   true,
+			},
+			"ais_api_url": schema.StringAttribute{
+				Description: "AIS API URL (for panes_ais_account and panes_ais_account_link resources). Defaults to https://ais.infra.aiworkflows.com. Can also be set with the AIS_API_URL environment variable.",
+				Optional:    true,
+			},
+			"ais_admin_token": schema.StringAttribute{
+				Description: "AIS admin token (Bearer). Provisioned via auth-service or stored in GSM as ais-staging-admin-token / ais-prod-admin-token. Can also be set with AIS_ADMIN_TOKEN.",
 				Optional:    true,
 				Sensitive:   true,
 			},
@@ -191,15 +203,34 @@ func (p *PanesProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		}
 	}
 
-	if panesClient == nil && fleetClient == nil && orchClient == nil {
+	// ---------- AIS client (required if panes_ais_* resources are used) ----------
+	aisURL := os.Getenv("AIS_API_URL")
+	if !config.AISAPIURL.IsNull() {
+		aisURL = config.AISAPIURL.ValueString()
+	}
+	if aisURL == "" {
+		aisURL = "https://ais.infra.aiworkflows.com"
+	}
+
+	aisToken := os.Getenv("AIS_ADMIN_TOKEN")
+	if !config.AISAdminToken.IsNull() {
+		aisToken = config.AISAdminToken.ValueString()
+	}
+
+	var aisClient *client.AISClient
+	if aisToken != "" {
+		aisClient = client.NewAIS(aisURL, aisToken, orgID)
+	}
+
+	if panesClient == nil && fleetClient == nil && orchClient == nil && aisClient == nil {
 		resp.Diagnostics.AddError(
 			"No provider tokens configured",
-			"At least one of PANES_TOKEN, FLEET_TOKEN, or ORCHESTRATOR_TOKEN/ORCHESTRATOR_CLIENT_ID+SECRET must be provided.",
+			"At least one of PANES_TOKEN, FLEET_TOKEN, ORCHESTRATOR_TOKEN/ORCHESTRATOR_CLIENT_ID+SECRET, or AIS_ADMIN_TOKEN must be provided.",
 		)
 		return
 	}
 
-	clients := &ProviderClients{Panes: panesClient, Fleet: fleetClient, Orchestrator: orchClient}
+	clients := &ProviderClients{Panes: panesClient, Fleet: fleetClient, Orchestrator: orchClient, AIS: aisClient}
 	resp.DataSourceData = clients
 	resp.ResourceData = clients
 }

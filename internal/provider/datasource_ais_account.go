@@ -18,7 +18,7 @@ var _ datasource.DataSource = &AISAccountDataSource{}
 // owning their lifecycle. Closes the lookup gap called out in
 // ai-workflows/docs#10 Phase 1 (fleet_account data source).
 type AISAccountDataSource struct {
-	client *client.Client
+	client *client.AISClient
 }
 
 type AISAccountDataSourceModel struct {
@@ -84,7 +84,7 @@ func (d *AISAccountDataSource) Configure(_ context.Context, req datasource.Confi
 		resp.Diagnostics.AddError("Unexpected DataSource Configure Type", fmt.Sprintf("Expected *ProviderClients, got: %T", req.ProviderData))
 		return
 	}
-	d.client = clients.Panes
+	d.client = clients.AIS
 }
 
 func (d *AISAccountDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -95,7 +95,10 @@ func (d *AISAccountDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	}
 
 	if d.client == nil {
-		resp.Diagnostics.AddError("Client not configured", "Panes/AIS client was not configured on this data source. Ensure the provider is configured with PANES_API_URL + PANES_PAT.")
+		resp.Diagnostics.AddError(
+			"AIS client not configured",
+			"Set ais_admin_token (and optionally ais_api_url) on the provider block, or AIS_ADMIN_TOKEN env var, to use the panes_ais_account data source.",
+		)
 		return
 	}
 
