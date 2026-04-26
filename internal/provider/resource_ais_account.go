@@ -20,7 +20,7 @@ var (
 )
 
 type AISAccountResource struct {
-	client *client.Client
+	client *client.AISClient
 }
 
 type AISAccountResourceModel struct {
@@ -119,11 +119,14 @@ func (r *AISAccountResource) Configure(_ context.Context, req resource.Configure
 		resp.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *ProviderClients, got: %T", req.ProviderData))
 		return
 	}
-	if pd.Panes == nil {
-		resp.Diagnostics.AddError("Panes client not configured", "Set PANES_TOKEN (or token = ...) to manage panes_ais_account resources.")
+	if pd.AIS == nil {
+		resp.Diagnostics.AddError(
+			"AIS client not configured",
+			"Set ais_admin_token (and optionally ais_api_url) on the provider block, or AIS_ADMIN_TOKEN env var, to manage panes_ais_account resources.",
+		)
 		return
 	}
-	r.client = pd.Panes
+	r.client = pd.AIS
 }
 
 func (r *AISAccountResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
