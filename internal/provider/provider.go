@@ -67,11 +67,11 @@ func (p *PanesProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 				Optional:    true,
 			},
 			"fleet_api_url": schema.StringAttribute{
-				Description: "Fleet API URL (for panes_engagement resources). Can also be set with the FLEET_API_URL or FLEET_URL environment variable.",
+				Description: "Portal API URL (defaults to https://app.fleet.build). engagement-repo CI hits Portal, which proxies to Fleet server-side. Can also be set with the FLEET_API_URL or FLEET_URL environment variable. The 'fleet_' prefix is kept for back-compat — the actual host is Portal.",
 				Optional:    true,
 			},
 			"fleet_token": schema.StringAttribute{
-				Description: "Fleet portal JWT (for panes_engagement resources). Can also be set with the FLEET_TOKEN environment variable.",
+				Description: "Portal-issued JWT (sub + org_id claims). Verified against Auth0 JWKS by Portal. Can also be set with the FLEET_TOKEN environment variable.",
 				Optional:    true,
 				Sensitive:   true,
 			},
@@ -123,7 +123,11 @@ func (p *PanesProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		panesClient = client.New(apiURL, token, orgID)
 	}
 
-	// ---------- Fleet client (required if panes_engagement is used) ----------
+	// ---------- Portal client (required if panes_engagement is used) ----------
+	// engagement-repo CI talks to Portal (app.fleet.build); Portal proxies the
+	// declarative-config calls to Fleet's internal API server-side. The
+	// fleet_api_url / FLEET_API_URL names are kept for back-compat, but the
+	// host they point at is Portal.
 	fleetURL := os.Getenv("FLEET_API_URL")
 	if fleetURL == "" {
 		fleetURL = os.Getenv("FLEET_URL")
@@ -132,7 +136,7 @@ func (p *PanesProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		fleetURL = config.FleetAPIURL.ValueString()
 	}
 	if fleetURL == "" {
-		fleetURL = "https://api.fleet.build"
+		fleetURL = "https://app.fleet.build"
 	}
 
 	fleetToken := os.Getenv("FLEET_TOKEN")

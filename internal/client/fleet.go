@@ -151,6 +151,16 @@ type UpdateEngagementRequest struct {
 	Config *EngagementConfig `json:"config,omitempty"`
 }
 
+// Engagement CRUD is rooted at Portal's `/api/engagements/*` surface (which
+// proxies to Fleet's `/api/teams/*` server-side). Engagement-repo CI and the
+// TF provider — both external clients — talk to Portal so Fleet can be locked
+// down to internal callers.
+//
+// Create still goes to /api/teams because Portal's /api/engagements collection
+// is a 308 redirect to /api/teams, and POST + redirect is fragile in many
+// HTTP clients. Read / Update / Delete go through the engagement-shaped paths
+// directly.
+
 func (c *FleetClient) CreateEngagement(ctx context.Context, req CreateEngagementRequest) (*Engagement, error) {
 	var resp Engagement
 	if err := c.do(ctx, http.MethodPost, "/api/teams", req, &resp); err != nil {
@@ -169,20 +179,63 @@ func (c *FleetClient) ListEngagements(ctx context.Context) ([]Engagement, error)
 
 func (c *FleetClient) GetEngagement(ctx context.Context, id string) (*Engagement, error) {
 	var resp Engagement
-	if err := c.do(ctx, http.MethodGet, "/api/teams/"+id, nil, &resp); err != nil {
+	if err := c.do(ctx, http.MethodGet, "/api/engagements/"+id, nil, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *FleetClient) UpdateEngagement(ctx context.Context, id string, req UpdateEngagementRequest) (*Engagement, error) {
-	var resp Engagement
-	if err := c.do(ctx, http.MethodPatch, "/api/teams/"+id, req, &resp); err != nil {
+// PutEngagementConfigRequest matches Portal's PUT /api/engagements/:id/config
+// (which proxies to Fleet's PUT /api/teams/:id/config). Declarative shape —
+// give Fleet the full desired state, Fleet diffs against current and calls
+// Orchestrator / Slack / GitHub as needed.
+type PutEngagementConfigRequest struct {
+	SchemaVersion int                          `json:"schemaVersion,omitempty"`
+	Engagement    *PutEngagementBlock          `json:"engagement,omitempty"`
+	Agents        []EngagementAgentConfig      `json:"agents,omitempty"`
+}
+
+type PutEngagementBlock struct {
+	Name             string                    `json:"name,omitempty"`
+	Mode             string                    `json:"mode,omitempty"`
+	GuidedPrompt     *string                   `json:"guidedPrompt,omitempty"`
+	GithubRepos      *[]string                 `json:"githubRepos,omitempty"`
+	ApprovalPolicy   string                    `json:"approvalPolicy,omitempty"`
+	DirectRepoAccess *DirectRepoAccess         `json:"directRepoAccess,omitempty"`
+}
+
+// PutEngagementConfigResponse is the envelope Portal/Fleet returns from
+// GET / PUT /api/engagements/:id/config.
+type PutEngagementConfigResponse struct {
+	SchemaVersion int                       `json:"schemaVersion"`
+	Engagement    EngagementConfigEnvelope  `json:"engagement"`
+	Agents        []EngagementAgentConfig   `json:"agents"`
+}
+
+type EngagementConfigEnvelope struct {
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	OrgID            string            `json:"orgId"`
+	Status           string            `json:"status"`
+	SlackChannelName string            `json:"slackChannelName"`
+	SlackChannelURL  string            `json:"slackChannelUrl"`
+	Repo             string            `json:"repo"`
+	RepoURL          string            `json:"repoUrl"`
+	Mode             string            `json:"mode"`
+	GuidedPrompt     string            `json:"guidedPrompt"`
+	GithubRepos      []string          `json:"githubRepos"`
+	ApprovalPolicy   string            `json:"approvalPolicy"`
+	DirectRepoAccess DirectRepoAccess  `json:"directRepoAccess"`
+}
+
+func (c *FleetClient) UpdateEngagementConfig(ctx context.Context, id string, req PutEngagementConfigRequest) (*PutEngagementConfigResponse, error) {
+	var resp PutEngagementConfigResponse
+	if err := c.do(ctx, http.MethodPut, "/api/engagements/"+id+"/config", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
 func (c *FleetClient) DeleteEngagement(ctx context.Context, id string) error {
-	return c.do(ctx, http.MethodDelete, "/api/teams/"+id, nil, nil)
+	return c.do(ctx, http.MethodDelete, "/api/engagements/"+id, nil, nil)
 }
