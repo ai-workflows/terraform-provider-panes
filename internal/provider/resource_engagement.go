@@ -247,20 +247,23 @@ func (r *EngagementResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	config, err := buildEngagementConfig(ctx, plan)
+	configReq, err := buildPutEngagementConfigRequest(ctx, plan)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid engagement config", err.Error())
 		return
 	}
 
-	updateReq := client.UpdateEngagementRequest{
-		Name:   plan.Name.ValueString(),
-		Config: &config,
+	if _, err := r.fleet.UpdateEngagementConfig(ctx, state.ID.ValueString(), configReq); err != nil {
+		resp.Diagnostics.AddError("Failed to update engagement", err.Error())
+		return
 	}
 
-	eng, err := r.fleet.UpdateEngagement(ctx, state.ID.ValueString(), updateReq)
+	// Re-read the engagement so state mirrors what Fleet committed (including
+	// computed fields like the comms agent id and worker agent ids that the
+	// declarative config endpoint doesn't surface).
+	eng, err := r.fleet.GetEngagement(ctx, state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to update engagement", err.Error())
+		resp.Diagnostics.AddError("Failed to refresh engagement after update", err.Error())
 		return
 	}
 
@@ -349,6 +352,41 @@ func buildCreateEngagementRequest(ctx context.Context, plan EngagementResourceMo
 		Mode:             plan.Mode.ValueString(),
 		SlackChannelName: plan.SlackChannelName.ValueString(),
 		Config:           config,
+	}, nil
+}
+
+// buildPutEngagementConfigRequest shapes the resource model into the
+// declarative envelope Portal's PUT /api/engagements/:id/config expects.
+//
+// Pointer fields are used where "omitted" and "explicit empty" need different
+// semantics — `GuidedPrompt` and `GithubRepos` distinguish "leave the engagement
+// alone" (nil) from "set this to empty" (non-nil pointer to zero value).
+func buildPutEngagementConfigRequest(ctx context.Context, plan EngagementResourceModel) (client.PutEngagementConfigRequest, error) {
+	config, err := buildEngagementConfig(ctx, plan)
+	if err != nil {
+		return client.PutEngagementConfigRequest{}, err
+	}
+
+	engagement := &client.PutEngagementBlock{
+		Name: plan.Name.ValueString(),
+		Mode: plan.Mode.ValueString(),
+	}
+	if !plan.GuidedPrompt.IsNull() && !plan.GuidedPrompt.IsUnknown() {
+		gp := plan.GuidedPrompt.ValueString()
+		engagement.GuidedPrompt = &gp
+	}
+	if !plan.GithubRepos.IsNull() && !plan.GithubRepos.IsUnknown() {
+		repos := config.GithubRepos
+		if repos == nil {
+			repos = []string{}
+		}
+		engagement.GithubRepos = &repos
+	}
+
+	return client.PutEngagementConfigRequest{
+		SchemaVersion: 1,
+		Engagement:    engagement,
+		Agents:        config.Agents,
 	}, nil
 }
 
