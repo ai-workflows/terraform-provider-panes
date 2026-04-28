@@ -96,11 +96,18 @@ func (c *FleetClient) do(ctx context.Context, method, path string, body any, res
 
 // --- Engagement (Team) types ---
 
+type EngagementAgentInstanceConfig struct {
+	Suffix     string `json:"suffix,omitempty"`
+	Focus      string `json:"focus,omitempty"`
+	AisAgentID string `json:"aisAgentId,omitempty"`
+}
+
 type EngagementAgentConfig struct {
-	Role         string `json:"role"`
-	Count        int    `json:"count"`
-	ComputeClass string `json:"computeClass,omitempty"`
-	Model        string `json:"model,omitempty"`
+	Role         string                          `json:"role"`
+	Count        int                             `json:"count"`
+	ComputeClass string                          `json:"computeClass,omitempty"`
+	Model        string                          `json:"model,omitempty"`
+	Instances    []EngagementAgentInstanceConfig `json:"instances,omitempty"`
 }
 
 type EngagementConfig struct {
@@ -108,6 +115,11 @@ type EngagementConfig struct {
 	GuidedPrompt string                  `json:"guidedPrompt,omitempty"`
 	Agents       []EngagementAgentConfig `json:"agents"`
 	GithubRepos  []string                `json:"githubRepos,omitempty"`
+}
+
+type DirectRepoAccess struct {
+	Enabled   bool     `json:"enabled"`
+	Usernames []string `json:"usernames"`
 }
 
 type Engagement struct {

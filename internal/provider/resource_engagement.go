@@ -28,11 +28,18 @@ type EngagementResource struct {
 	fleet *client.FleetClient
 }
 
+type EngagementAgentInstanceModel struct {
+	Suffix     types.String `tfsdk:"suffix"`
+	Focus      types.String `tfsdk:"focus"`
+	AisAgentID types.String `tfsdk:"ais_agent_id"`
+}
+
 type EngagementAgentModel struct {
-	Role         types.String `tfsdk:"role"`
-	Count        types.Int64  `tfsdk:"count"`
-	ComputeClass types.String `tfsdk:"compute_class"`
-	Model        types.String `tfsdk:"model"`
+	Role         types.String                   `tfsdk:"role"`
+	Count        types.Int64                    `tfsdk:"count"`
+	ComputeClass types.String                   `tfsdk:"compute_class"`
+	Model        types.String                   `tfsdk:"model"`
+	Instances    []EngagementAgentInstanceModel `tfsdk:"instances"`
 }
 
 type EngagementResourceModel struct {
@@ -116,6 +123,26 @@ func (r *EngagementResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						"model": schema.StringAttribute{
 							Description: "Override model for this role.",
 							Optional:    true,
+						},
+						"instances": schema.ListNestedAttribute{
+							Description: "Per-instance attributes (suffix / focus / ais_agent_id). When set, length must equal count. Use when distinct workers in the same role need different focus areas (e.g. builder #1 'Meta Pixel', builder #2 'Reviews').",
+							Optional:    true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"suffix": schema.StringAttribute{
+										Description: "Stable suffix for this instance — used in the agent name (e.g. 'amboras-builder-1').",
+										Optional:    true,
+									},
+									"focus": schema.StringAttribute{
+										Description: "Free-form focus statement, substituted into the role's prompt template.",
+										Optional:    true,
+									},
+									"ais_agent_id": schema.StringAttribute{
+										Description: "Pre-existing AIS agent identity to bind. Empty = Fleet provisions one.",
+										Optional:    true,
+									},
+								},
+							},
 						},
 					},
 				},
@@ -277,12 +304,27 @@ func buildEngagementConfig(ctx context.Context, plan EngagementResourceModel) (c
 	}
 
 	for _, a := range plan.Agents {
-		config.Agents = append(config.Agents, client.EngagementAgentConfig{
+		agentConfig := client.EngagementAgentConfig{
 			Role:         a.Role.ValueString(),
 			Count:        int(a.Count.ValueInt64()),
 			ComputeClass: a.ComputeClass.ValueString(),
 			Model:        a.Model.ValueString(),
-		})
+		}
+		// Per-instance attributes — only emit when the user actually provided
+		// instances. Empty/nil instances tells Fleet "all instances of this
+		// role are identical" (current behavior).
+		if len(a.Instances) > 0 {
+			instances := make([]client.EngagementAgentInstanceConfig, 0, len(a.Instances))
+			for _, inst := range a.Instances {
+				instances = append(instances, client.EngagementAgentInstanceConfig{
+					Suffix:     inst.Suffix.ValueString(),
+					Focus:      inst.Focus.ValueString(),
+					AisAgentID: inst.AisAgentID.ValueString(),
+				})
+			}
+			agentConfig.Instances = instances
+		}
+		config.Agents = append(config.Agents, agentConfig)
 	}
 
 	if !plan.GithubRepos.IsNull() && !plan.GithubRepos.IsUnknown() {
