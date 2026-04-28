@@ -38,6 +38,67 @@ func TestBuildEngagementConfig_WithAgentsAndRepos(t *testing.T) {
 	}
 }
 
+func TestBuildEngagementConfig_PerInstanceAttributes(t *testing.T) {
+	plan := EngagementResourceModel{
+		Name:        types.StringValue("Amboras"),
+		Mode:        types.StringValue("standard"),
+		GithubRepos: types.ListNull(types.StringType),
+		Agents: []EngagementAgentModel{
+			{
+				Role:  types.StringValue("builder"),
+				Count: types.Int64Value(2),
+				Instances: []EngagementAgentInstanceModel{
+					{
+						Suffix: types.StringValue("1"),
+						Focus:  types.StringValue("Meta Pixel events + Klaviyo"),
+					},
+					{
+						Suffix:     types.StringValue("2"),
+						Focus:      types.StringValue("Reviews system (Loox clone)"),
+						AisAgentID: types.StringValue("ais-pre-existing-7"),
+					},
+				},
+			},
+		},
+	}
+
+	got, err := buildEngagementConfig(context.Background(), plan)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got.Agents) != 1 {
+		t.Fatalf("expected 1 agent role entry, got %d", len(got.Agents))
+	}
+	if len(got.Agents[0].Instances) != 2 {
+		t.Fatalf("expected 2 instance entries, got %d", len(got.Agents[0].Instances))
+	}
+	if got.Agents[0].Instances[0].Focus != "Meta Pixel events + Klaviyo" {
+		t.Fatalf("unexpected focus on instance 0: %q", got.Agents[0].Instances[0].Focus)
+	}
+	if got.Agents[0].Instances[1].AisAgentID != "ais-pre-existing-7" {
+		t.Fatalf("unexpected ais_agent_id on instance 1: %q", got.Agents[0].Instances[1].AisAgentID)
+	}
+}
+
+func TestBuildEngagementConfig_OmitsInstancesWhenAbsent(t *testing.T) {
+	plan := EngagementResourceModel{
+		Name:        types.StringValue("Vanilla"),
+		Mode:        types.StringValue("standard"),
+		GithubRepos: types.ListNull(types.StringType),
+		Agents: []EngagementAgentModel{
+			{Role: types.StringValue("builder"), Count: types.Int64Value(2)},
+		},
+	}
+
+	got, err := buildEngagementConfig(context.Background(), plan)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Agents[0].Instances != nil {
+		t.Fatalf("expected Instances to be nil when not provided, got %+v", got.Agents[0].Instances)
+	}
+}
+
 func TestBuildCreateEngagementRequest_ChatAgentMode(t *testing.T) {
 	plan := EngagementResourceModel{
 		Name:             types.StringValue("Support"),
