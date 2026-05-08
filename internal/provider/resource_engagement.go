@@ -32,6 +32,12 @@ type EngagementAgentInstanceModel struct {
 	Suffix     types.String `tfsdk:"suffix"`
 	Focus      types.String `tfsdk:"focus"`
 	AisAgentID types.String `tfsdk:"ais_agent_id"`
+	// Per-instance paused flag. When true, Fleet asks orchestrator to
+	// pause this worker so it stops accruing billable cycles.
+	// Comms-agent flow: customer asks to halt → comms flips this in
+	// terraform/main.tf → CI applies → Fleet calls
+	// orchestrator.pauseAgent on the matching worker. CEV §4.
+	Paused types.Bool `tfsdk:"paused"`
 }
 
 type EngagementAgentModel struct {
@@ -139,6 +145,10 @@ func (r *EngagementResource) Schema(_ context.Context, _ resource.SchemaRequest,
 									},
 									"ais_agent_id": schema.StringAttribute{
 										Description: "Pre-existing AIS agent identity to bind. Empty = Fleet provisions one.",
+										Optional:    true,
+									},
+									"paused": schema.BoolAttribute{
+										Description: "Pause this worker. When flipped to true, Fleet calls orchestrator.pauseAgent on the matching agent so it stops accruing billable cycles. Flip back to false / omit to resume.",
 										Optional:    true,
 									},
 								},
@@ -319,11 +329,20 @@ func buildEngagementConfig(ctx context.Context, plan EngagementResourceModel) (c
 		if len(a.Instances) > 0 {
 			instances := make([]client.EngagementAgentInstanceConfig, 0, len(a.Instances))
 			for _, inst := range a.Instances {
-				instances = append(instances, client.EngagementAgentInstanceConfig{
+				cfg := client.EngagementAgentInstanceConfig{
 					Suffix:     inst.Suffix.ValueString(),
 					Focus:      inst.Focus.ValueString(),
 					AisAgentID: inst.AisAgentID.ValueString(),
-				})
+				}
+				// Only forward `paused` when the practitioner set it
+				// explicitly. Null/unknown means "leave Fleet alone";
+				// explicit true/false drives the pauseAgent/wakeAgent
+				// reconciler on the Fleet side.
+				if !inst.Paused.IsNull() && !inst.Paused.IsUnknown() {
+					v := inst.Paused.ValueBool()
+					cfg.Paused = &v
+				}
+				instances = append(instances, cfg)
 			}
 			agentConfig.Instances = instances
 		}
