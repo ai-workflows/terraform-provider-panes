@@ -100,6 +100,11 @@ type EngagementAgentInstanceConfig struct {
 	Suffix     string `json:"suffix,omitempty"`
 	Focus      string `json:"focus,omitempty"`
 	AisAgentID string `json:"aisAgentId,omitempty"`
+	// Per-instance paused flag. When true, Fleet's PUT
+	// /api/teams/:id/config reconciler asks orchestrator to pause
+	// the matching worker. Sent as `paused: true|false` in JSON; the
+	// Fleet zod schema rejects other shapes.
+	Paused *bool `json:"paused,omitempty"`
 }
 
 type EngagementAgentConfig struct {
