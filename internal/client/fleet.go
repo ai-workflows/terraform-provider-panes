@@ -96,6 +96,11 @@ func (c *FleetClient) do(ctx context.Context, method, path string, body any, res
 
 // --- Engagement (Team) types ---
 
+// Modular role-prompts axes (fleet phases 2/3/4). Wire shape matches
+// fleet's TS types — see fleet/src/types.ts and
+// fleet/docs/design/modular-role-prompts.md. Pointer / omitempty fields
+// keep "unset" distinct from "explicit empty" so the practitioner can
+// declare-nothing without overwriting Fleet defaults.
 type EngagementAgentInstanceConfig struct {
 	Suffix     string `json:"suffix,omitempty"`
 	Focus      string `json:"focus,omitempty"`
@@ -105,6 +110,12 @@ type EngagementAgentInstanceConfig struct {
 	// the matching worker. Sent as `paused: true|false` in JSON; the
 	// Fleet zod schema rejects other shapes.
 	Paused *bool `json:"paused,omitempty"`
+	// Phase 2 builder axes (per-instance overrides).
+	MergePosture         string   `json:"mergePosture,omitempty"`
+	BlockedBehavior      string   `json:"blockedBehavior,omitempty"`
+	PathsRequiringReview []string `json:"pathsRequiringReview,omitempty"`
+	// Phase 4 per-instance free-form additions (≤500 chars; truncated by Fleet at render).
+	FreeformInstructions string `json:"freeformInstructions,omitempty"`
 }
 
 type EngagementAgentConfig struct {
@@ -113,6 +124,20 @@ type EngagementAgentConfig struct {
 	ComputeClass string                          `json:"computeClass,omitempty"`
 	Model        string                          `json:"model,omitempty"`
 	Instances    []EngagementAgentInstanceConfig `json:"instances,omitempty"`
+	// Phase 2 builder axes (role-level defaults; per-instance overrides above).
+	MergePosture         string   `json:"mergePosture,omitempty"`
+	BlockedBehavior      string   `json:"blockedBehavior,omitempty"`
+	PathsRequiringReview []string `json:"pathsRequiringReview,omitempty"`
+	FreeformInstructions string   `json:"freeformInstructions,omitempty"`
+}
+
+// EngagementCommsConfig carries the comms agent's behavior axes. Comms
+// is implicit (one per engagement, not in agents[]) so its axes live at
+// the engagement level. See fleet/src/types.ts CommsConfig.
+type EngagementCommsConfig struct {
+	UpdateCadence        string `json:"updateCadence,omitempty"`
+	EscalationThreshold  string `json:"escalationThreshold,omitempty"`
+	FreeformInstructions string `json:"freeformInstructions,omitempty"`
 }
 
 type EngagementConfig struct {
@@ -120,6 +145,14 @@ type EngagementConfig struct {
 	GuidedPrompt string                  `json:"guidedPrompt,omitempty"`
 	Agents       []EngagementAgentConfig `json:"agents"`
 	GithubRepos  []string                `json:"githubRepos,omitempty"`
+	// Phase 5 engagement-wide builder merge_posture default. Per-role
+	// agents[i].MergePosture overrides this; per-instance overrides that.
+	MergePosture string `json:"mergePosture,omitempty"`
+	// Phase 4 context inputs — Fleet appends to every agent's system prompt.
+	OrgContext        string `json:"orgContext,omitempty"`
+	EngagementContext string `json:"engagementContext,omitempty"`
+	// Phase 3 comms agent axes.
+	CommsConfig *EngagementCommsConfig `json:"commsConfig,omitempty"`
 }
 
 type DirectRepoAccess struct {
