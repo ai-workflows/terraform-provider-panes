@@ -266,38 +266,6 @@ func (r *EngagementResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					},
 				},
 			},
-			"merge_posture": schema.StringAttribute{
-				Description: "Engagement-wide builder merge_posture default. Per-role and per-instance values override. Values: auto_merge_on_ci_green | wait_for_agent_review | wait_for_customer_review | do_not_merge.",
-				Optional:    true,
-			},
-			"org_context": schema.StringAttribute{
-				Description: "Org-level context appended to every agent's system prompt. Usually set once in portal /settings; engagement TF should leave this unset unless overriding.",
-				Optional:    true,
-			},
-			"engagement_context": schema.StringAttribute{
-				Description: "Per-engagement context appended to every agent's system prompt. Defaults to scope_doc on launch; set here to override.",
-				Optional:    true,
-			},
-			"comms_config": schema.ListNestedAttribute{
-				Description: "Comms agent behavior axes. At most one block — comms is implicit per engagement.",
-				Optional:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"update_cadence": schema.StringAttribute{
-							Description: "How proactively comms posts Slack updates. Values: silent | milestone (default) | proactive.",
-							Optional:    true,
-						},
-						"escalation_threshold": schema.StringAttribute{
-							Description: "When comms surfaces builder-filed blockers to the customer. Values: escalate_early | self_resolve_first (default).",
-							Optional:    true,
-						},
-						"freeform_instructions": schema.StringAttribute{
-							Description: "Free-form supplementary instructions for the comms agent. Truncated to 500 chars at render time.",
-							Optional:    true,
-						},
-					},
-				},
-			},
 		},
 	}
 }
