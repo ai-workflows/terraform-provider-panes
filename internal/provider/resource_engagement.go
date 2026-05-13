@@ -38,6 +38,12 @@ type EngagementAgentInstanceModel struct {
 	// terraform/main.tf → CI applies → Fleet calls
 	// orchestrator.pauseAgent on the matching worker. CEV §4.
 	Paused types.Bool `tfsdk:"paused"`
+	// Modular role-prompts axes (per-instance overrides).
+	// See fleet/docs/design/modular-role-prompts.md.
+	MergePosture         types.String `tfsdk:"merge_posture"`
+	BlockedBehavior      types.String `tfsdk:"blocked_behavior"`
+	PathsRequiringReview types.List   `tfsdk:"paths_requiring_review"`
+	FreeformInstructions types.String `tfsdk:"freeform_instructions"`
 }
 
 type EngagementAgentModel struct {
@@ -46,6 +52,20 @@ type EngagementAgentModel struct {
 	ComputeClass types.String                   `tfsdk:"compute_class"`
 	Model        types.String                   `tfsdk:"model"`
 	Instances    []EngagementAgentInstanceModel `tfsdk:"instances"`
+	// Role-level defaults; per-instance values above override.
+	MergePosture         types.String `tfsdk:"merge_posture"`
+	BlockedBehavior      types.String `tfsdk:"blocked_behavior"`
+	PathsRequiringReview types.List   `tfsdk:"paths_requiring_review"`
+	FreeformInstructions types.String `tfsdk:"freeform_instructions"`
+}
+
+// EngagementCommsConfigModel — comms agent behavior axes. Comms is
+// implicit (one per engagement, not in agents[]) so its axes live at
+// the engagement level.
+type EngagementCommsConfigModel struct {
+	UpdateCadence        types.String `tfsdk:"update_cadence"`
+	EscalationThreshold  types.String `tfsdk:"escalation_threshold"`
+	FreeformInstructions types.String `tfsdk:"freeform_instructions"`
 }
 
 type EngagementResourceModel struct {
@@ -60,6 +80,15 @@ type EngagementResourceModel struct {
 	GithubRepos      types.List             `tfsdk:"github_repos"`
 	CommsAgentID     types.String           `tfsdk:"comms_agent_id"`
 	WorkerAgentIDs   types.List             `tfsdk:"worker_agent_ids"`
+	// Engagement-wide builder merge_posture default. Per-role and
+	// per-instance values override.
+	MergePosture types.String `tfsdk:"merge_posture"`
+	// Context inputs Fleet appends to every agent's system prompt.
+	OrgContext        types.String `tfsdk:"org_context"`
+	EngagementContext types.String `tfsdk:"engagement_context"`
+	// Comms-only behavior axes. List for terraform-plugin-framework
+	// single-nested-object semantics — length 0 or 1.
+	CommsConfig []EngagementCommsConfigModel `tfsdk:"comms_config"`
 }
 
 func NewEngagementResource() resource.Resource {
@@ -130,6 +159,23 @@ func (r *EngagementResource) Schema(_ context.Context, _ resource.SchemaRequest,
 							Description: "Override model for this role.",
 							Optional:    true,
 						},
+						"merge_posture": schema.StringAttribute{
+							Description: "Role-level merge_posture default (builders only). Overrides the engagement-wide value; per-instance values override this. Values: auto_merge_on_ci_green | wait_for_agent_review | wait_for_customer_review | do_not_merge.",
+							Optional:    true,
+						},
+						"blocked_behavior": schema.StringAttribute{
+							Description: "How builders react when blocked. Values: try_other_work (default) | stop_and_pause.",
+							Optional:    true,
+						},
+						"paths_requiring_review": schema.ListAttribute{
+							Description: "Customer-repo path globs that force wait_for_agent_review semantics regardless of base merge_posture (e.g. ['src/oidc/**']).",
+							ElementType: types.StringType,
+							Optional:    true,
+						},
+						"freeform_instructions": schema.StringAttribute{
+							Description: "Free-form addition appended to every agent of this role's system prompt. Truncated to 500 chars at render time.",
+							Optional:    true,
+						},
 						"instances": schema.ListNestedAttribute{
 							Description: "Per-instance attributes (suffix / focus / ais_agent_id). When set, length must equal count. Use when distinct workers in the same role need different focus areas (e.g. builder #1 'Meta Pixel', builder #2 'Reviews').",
 							Optional:    true,
@@ -151,6 +197,23 @@ func (r *EngagementResource) Schema(_ context.Context, _ resource.SchemaRequest,
 										Description: "Pause this worker. When flipped to true, Fleet calls orchestrator.pauseAgent on the matching agent so it stops accruing billable cycles. Flip back to false / omit to resume.",
 										Optional:    true,
 									},
+									"merge_posture": schema.StringAttribute{
+										Description: "Per-instance merge_posture override. Same values as the role-level field.",
+										Optional:    true,
+									},
+									"blocked_behavior": schema.StringAttribute{
+										Description: "Per-instance blocked_behavior override.",
+										Optional:    true,
+									},
+									"paths_requiring_review": schema.ListAttribute{
+										Description: "Per-instance paths_requiring_review override.",
+										ElementType: types.StringType,
+										Optional:    true,
+									},
+									"freeform_instructions": schema.StringAttribute{
+										Description: "Per-instance free-form addition. Truncated to 500 chars at render time.",
+										Optional:    true,
+									},
 								},
 							},
 						},
@@ -170,6 +233,70 @@ func (r *EngagementResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Description: "Worker agent IDs assigned by Fleet.",
 				ElementType: types.StringType,
 				Computed:    true,
+			},
+			"merge_posture": schema.StringAttribute{
+				Description: "Engagement-wide builder merge_posture default. Per-role and per-instance values override. Values: auto_merge_on_ci_green | wait_for_agent_review | wait_for_customer_review | do_not_merge.",
+				Optional:    true,
+			},
+			"org_context": schema.StringAttribute{
+				Description: "Org-level context appended to every agent's system prompt. Usually set once in portal /settings; engagement TF should leave this unset unless overriding.",
+				Optional:    true,
+			},
+			"engagement_context": schema.StringAttribute{
+				Description: "Per-engagement context appended to every agent's system prompt. Defaults to scope_doc on launch; set here to override.",
+				Optional:    true,
+			},
+			"comms_config": schema.ListNestedAttribute{
+				Description: "Comms agent behavior axes. At most one block — comms is implicit per engagement.",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"update_cadence": schema.StringAttribute{
+							Description: "How proactively comms posts Slack updates. Values: silent | milestone (default) | proactive.",
+							Optional:    true,
+						},
+						"escalation_threshold": schema.StringAttribute{
+							Description: "When comms surfaces builder-filed blockers to the customer. Values: escalate_early | self_resolve_first (default).",
+							Optional:    true,
+						},
+						"freeform_instructions": schema.StringAttribute{
+							Description: "Free-form supplementary instructions for the comms agent. Truncated to 500 chars at render time.",
+							Optional:    true,
+						},
+					},
+				},
+			},
+			"merge_posture": schema.StringAttribute{
+				Description: "Engagement-wide builder merge_posture default. Per-role and per-instance values override. Values: auto_merge_on_ci_green | wait_for_agent_review | wait_for_customer_review | do_not_merge.",
+				Optional:    true,
+			},
+			"org_context": schema.StringAttribute{
+				Description: "Org-level context appended to every agent's system prompt. Usually set once in portal /settings; engagement TF should leave this unset unless overriding.",
+				Optional:    true,
+			},
+			"engagement_context": schema.StringAttribute{
+				Description: "Per-engagement context appended to every agent's system prompt. Defaults to scope_doc on launch; set here to override.",
+				Optional:    true,
+			},
+			"comms_config": schema.ListNestedAttribute{
+				Description: "Comms agent behavior axes. At most one block — comms is implicit per engagement.",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"update_cadence": schema.StringAttribute{
+							Description: "How proactively comms posts Slack updates. Values: silent | milestone (default) | proactive.",
+							Optional:    true,
+						},
+						"escalation_threshold": schema.StringAttribute{
+							Description: "When comms surfaces builder-filed blockers to the customer. Values: escalate_early | self_resolve_first (default).",
+							Optional:    true,
+						},
+						"freeform_instructions": schema.StringAttribute{
+							Description: "Free-form supplementary instructions for the comms agent. Truncated to 500 chars at render time.",
+							Optional:    true,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -311,17 +438,31 @@ func (r *EngagementResource) ImportState(ctx context.Context, req resource.Impor
 
 func buildEngagementConfig(ctx context.Context, plan EngagementResourceModel) (client.EngagementConfig, error) {
 	config := client.EngagementConfig{
-		Mode:         plan.Mode.ValueString(),
-		GuidedPrompt: plan.GuidedPrompt.ValueString(),
-		Agents:       []client.EngagementAgentConfig{},
+		Mode:              plan.Mode.ValueString(),
+		GuidedPrompt:      plan.GuidedPrompt.ValueString(),
+		Agents:            []client.EngagementAgentConfig{},
+		MergePosture:      plan.MergePosture.ValueString(),
+		OrgContext:        plan.OrgContext.ValueString(),
+		EngagementContext: plan.EngagementContext.ValueString(),
 	}
 
 	for _, a := range plan.Agents {
 		agentConfig := client.EngagementAgentConfig{
-			Role:         a.Role.ValueString(),
-			Count:        int(a.Count.ValueInt64()),
-			ComputeClass: a.ComputeClass.ValueString(),
-			Model:        a.Model.ValueString(),
+			Role:                 a.Role.ValueString(),
+			Count:                int(a.Count.ValueInt64()),
+			ComputeClass:         a.ComputeClass.ValueString(),
+			Model:                a.Model.ValueString(),
+			MergePosture:         a.MergePosture.ValueString(),
+			BlockedBehavior:      a.BlockedBehavior.ValueString(),
+			FreeformInstructions: a.FreeformInstructions.ValueString(),
+		}
+		if !a.PathsRequiringReview.IsNull() && !a.PathsRequiringReview.IsUnknown() {
+			var paths []string
+			diags := a.PathsRequiringReview.ElementsAs(ctx, &paths, false)
+			if diags.HasError() {
+				return config, fmt.Errorf("invalid agents[%s].paths_requiring_review: %s", a.Role.ValueString(), diags.Errors()[0].Summary())
+			}
+			agentConfig.PathsRequiringReview = paths
 		}
 		// Per-instance attributes — only emit when the user actually provided
 		// instances. Empty/nil instances tells Fleet "all instances of this
@@ -330,9 +471,20 @@ func buildEngagementConfig(ctx context.Context, plan EngagementResourceModel) (c
 			instances := make([]client.EngagementAgentInstanceConfig, 0, len(a.Instances))
 			for _, inst := range a.Instances {
 				cfg := client.EngagementAgentInstanceConfig{
-					Suffix:     inst.Suffix.ValueString(),
-					Focus:      inst.Focus.ValueString(),
-					AisAgentID: inst.AisAgentID.ValueString(),
+					Suffix:               inst.Suffix.ValueString(),
+					Focus:                inst.Focus.ValueString(),
+					AisAgentID:           inst.AisAgentID.ValueString(),
+					MergePosture:         inst.MergePosture.ValueString(),
+					BlockedBehavior:      inst.BlockedBehavior.ValueString(),
+					FreeformInstructions: inst.FreeformInstructions.ValueString(),
+				}
+				if !inst.PathsRequiringReview.IsNull() && !inst.PathsRequiringReview.IsUnknown() {
+					var paths []string
+					diags := inst.PathsRequiringReview.ElementsAs(ctx, &paths, false)
+					if diags.HasError() {
+						return config, fmt.Errorf("invalid agents[%s].instances[].paths_requiring_review: %s", a.Role.ValueString(), diags.Errors()[0].Summary())
+					}
+					cfg.PathsRequiringReview = paths
 				}
 				// Only forward `paused` when the practitioner set it
 				// explicitly. Null/unknown means "leave Fleet alone";
@@ -356,6 +508,18 @@ func buildEngagementConfig(ctx context.Context, plan EngagementResourceModel) (c
 			return config, fmt.Errorf("invalid github_repos: %s", diags.Errors()[0].Summary())
 		}
 		config.GithubRepos = repos
+	}
+
+	// Comms config is modeled as a List of length 0 or 1 (no native
+	// single-nested attribute in this framework version, matching the
+	// instances[] pattern above). Take the first row if present.
+	if len(plan.CommsConfig) > 0 {
+		c := plan.CommsConfig[0]
+		config.CommsConfig = &client.EngagementCommsConfig{
+			UpdateCadence:        c.UpdateCadence.ValueString(),
+			EscalationThreshold:  c.EscalationThreshold.ValueString(),
+			FreeformInstructions: c.FreeformInstructions.ValueString(),
+		}
 	}
 
 	return config, nil
@@ -419,6 +583,15 @@ func engagementToModel(eng *client.Engagement, plan EngagementResourceModel) Eng
 		GuidedPrompt:     plan.GuidedPrompt,
 		Agents:           plan.Agents,
 		GithubRepos:      plan.GithubRepos,
+		// Phase 2-5 modular-prompts axes — Fleet stores these in
+		// EngagementConfig but we preserve from plan for now so the TF
+		// diff loop converges. A future revision can read these back
+		// from `eng.Config` to detect drift, once Fleet reliably
+		// echoes them on the GET response.
+		MergePosture:      plan.MergePosture,
+		OrgContext:        plan.OrgContext,
+		EngagementContext: plan.EngagementContext,
+		CommsConfig:       plan.CommsConfig,
 	}
 
 	if eng.SlackChannelID != "" {
