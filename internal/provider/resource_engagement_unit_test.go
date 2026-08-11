@@ -221,14 +221,14 @@ func TestEngagementToModel_PreservesPlanInputsAndFillsComputed(t *testing.T) {
 	}
 
 	eng := &client.Engagement{
-		ID:               "eng-1",
-		Name:             "Meridian",
-		Status:           "active",
-		Mode:             "standard",
-		SlackChannelID:   "C1",
-		CommsAgentID:     "comms-1",
-		WorkerAgentIDs:   []string{"w1", "w2"},
-		Config:           client.EngagementConfig{Mode: "standard"},
+		ID:             "eng-1",
+		Name:           "Meridian",
+		Status:         "active",
+		Mode:           "standard",
+		SlackChannelID: "C1",
+		CommsAgentID:   "comms-1",
+		WorkerAgentIDs: []string{"w1", "w2"},
+		Config:         client.EngagementConfig{Mode: "standard"},
 	}
 
 	out := engagementToModel(eng, plan)
@@ -257,5 +257,42 @@ func TestEngagementToModel_PreservesPlanInputsAndFillsComputed(t *testing.T) {
 	}
 	if len(workers) != 2 || workers[0] != "w1" || workers[1] != "w2" {
 		t.Fatalf("unexpected workers: %v", workers)
+	}
+}
+
+func TestEngagementToModel_HydratesFleetConfigDuringImport(t *testing.T) {
+	plan := EngagementResourceModel{
+		ID:          types.StringValue("eng-1"),
+		GithubRepos: types.ListNull(types.StringType),
+	}
+	eng := &client.Engagement{
+		ID:     "eng-1",
+		Name:   "Meridian",
+		Status: "completed",
+		Mode:   "standard",
+		Config: client.EngagementConfig{
+			Mode:        "standard",
+			GithubRepos: []string{"ai-workflows/meridian"},
+			Agents: []client.EngagementAgentConfig{
+				{Role: "builder", Count: 1, ComputeClass: "standard-2"},
+				{Role: "pm", Count: 1, ComputeClass: "standard"},
+			},
+		},
+	}
+
+	out := engagementToModel(eng, plan)
+	if len(out.Agents) != 2 {
+		t.Fatalf("expected two imported agent roles, got %d", len(out.Agents))
+	}
+	if out.Agents[0].Role.ValueString() != "builder" || out.Agents[0].ComputeClass.ValueString() != "standard-2" {
+		t.Fatalf("unexpected imported builder config: %+v", out.Agents[0])
+	}
+	if !out.Agents[0].Model.IsNull() || !out.Agents[0].PathsRequiringReview.IsNull() {
+		t.Fatalf("absent optional Fleet fields must remain Terraform null")
+	}
+	var repos []string
+	diags := out.GithubRepos.ElementsAs(context.Background(), &repos, false)
+	if diags.HasError() || len(repos) != 1 || repos[0] != "ai-workflows/meridian" {
+		t.Fatalf("unexpected imported github_repos: %v (%v)", repos, diags.Errors())
 	}
 }
