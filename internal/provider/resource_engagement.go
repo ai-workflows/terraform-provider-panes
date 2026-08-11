@@ -541,7 +541,70 @@ func buildPutEngagementConfigRequest(ctx context.Context, plan EngagementResourc
 	}, nil
 }
 
+func optionalString(value string) types.String {
+	if value == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(value)
+}
+
+func optionalStringList(values []string) types.List {
+	if len(values) == 0 {
+		return types.ListNull(types.StringType)
+	}
+	result, _ := types.ListValueFrom(context.Background(), types.StringType, values)
+	return result
+}
+
+func agentModelsFromFleet(configs []client.EngagementAgentConfig) []EngagementAgentModel {
+	models := make([]EngagementAgentModel, 0, len(configs))
+	for _, config := range configs {
+		var instances []EngagementAgentInstanceModel
+		if len(config.Instances) > 0 {
+			instances = make([]EngagementAgentInstanceModel, 0, len(config.Instances))
+		}
+		for _, instance := range config.Instances {
+			paused := types.BoolNull()
+			if instance.Paused != nil {
+				paused = types.BoolValue(*instance.Paused)
+			}
+			instances = append(instances, EngagementAgentInstanceModel{
+				Suffix:               optionalString(instance.Suffix),
+				Focus:                optionalString(instance.Focus),
+				AisAgentID:           optionalString(instance.AisAgentID),
+				Paused:               paused,
+				MergePosture:         optionalString(instance.MergePosture),
+				BlockedBehavior:      optionalString(instance.BlockedBehavior),
+				PathsRequiringReview: optionalStringList(instance.PathsRequiringReview),
+				FreeformInstructions: optionalString(instance.FreeformInstructions),
+			})
+		}
+
+		models = append(models, EngagementAgentModel{
+			Role:                 types.StringValue(config.Role),
+			Count:                types.Int64Value(int64(config.Count)),
+			ComputeClass:         optionalString(config.ComputeClass),
+			Model:                optionalString(config.Model),
+			Instances:            instances,
+			MergePosture:         optionalString(config.MergePosture),
+			BlockedBehavior:      optionalString(config.BlockedBehavior),
+			PathsRequiringReview: optionalStringList(config.PathsRequiringReview),
+			FreeformInstructions: optionalString(config.FreeformInstructions),
+		})
+	}
+	return models
+}
+
 func engagementToModel(eng *client.Engagement, plan EngagementResourceModel) EngagementResourceModel {
+	agents := plan.Agents
+	if agents == nil {
+		agents = agentModelsFromFleet(eng.Config.Agents)
+	}
+	githubRepos := plan.GithubRepos
+	if githubRepos.IsNull() || githubRepos.IsUnknown() {
+		githubRepos = optionalStringList(eng.Config.GithubRepos)
+	}
+
 	out := EngagementResourceModel{
 		ID:               types.StringValue(eng.ID),
 		Name:             types.StringValue(eng.Name),
@@ -549,8 +612,8 @@ func engagementToModel(eng *client.Engagement, plan EngagementResourceModel) Eng
 		Mode:             types.StringValue(resolveMode(eng)),
 		SlackChannelName: plan.SlackChannelName,
 		GuidedPrompt:     plan.GuidedPrompt,
-		Agents:           plan.Agents,
-		GithubRepos:      plan.GithubRepos,
+		Agents:           agents,
+		GithubRepos:      githubRepos,
 		// Phase 2-5 modular-prompts axes — Fleet stores these in
 		// EngagementConfig but we preserve from plan for now so the TF
 		// diff loop converges. A future revision can read these back
