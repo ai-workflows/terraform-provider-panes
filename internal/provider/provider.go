@@ -17,10 +17,11 @@ var _ provider.Provider = &PanesProvider{}
 // ProviderClients bundles the clients for each downstream service so
 // resources can pick the one they need during Configure().
 type ProviderClients struct {
-	Panes       *client.Client
-	Fleet       *client.FleetClient
-	AIS         *client.AISClient
-	ProxyRouter *client.ProxyRouterClient
+	Panes        *client.Client
+	Fleet        *client.FleetClient
+	Orchestrator *client.OrchestratorClient
+	AIS          *client.AISClient
+	ProxyRouter  *client.ProxyRouterClient
 }
 
 type PanesProvider struct {
@@ -28,14 +29,19 @@ type PanesProvider struct {
 }
 
 type PanesProviderModel struct {
-	APIURL         types.String `tfsdk:"api_url"`
-	Token          types.String `tfsdk:"token"`
-	OrgID          types.String `tfsdk:"org_id"`
-	FleetAPIURL    types.String `tfsdk:"fleet_api_url"`
-	FleetToken     types.String `tfsdk:"fleet_token"`
-	AISAPIURL      types.String `tfsdk:"ais_api_url"`
-	AISAdminToken  types.String `tfsdk:"ais_admin_token"`
-	ProxyRouterURL types.String `tfsdk:"proxy_router_url"`
+	APIURL                   types.String `tfsdk:"api_url"`
+	Token                    types.String `tfsdk:"token"`
+	OrgID                    types.String `tfsdk:"org_id"`
+	FleetAPIURL              types.String `tfsdk:"fleet_api_url"`
+	FleetToken               types.String `tfsdk:"fleet_token"`
+	OrchestratorURL          types.String `tfsdk:"orchestrator_url"`
+	OrchestratorToken        types.String `tfsdk:"orchestrator_token"`
+	OrchestratorAuthURL      types.String `tfsdk:"orchestrator_auth_url"`
+	OrchestratorClientID     types.String `tfsdk:"orchestrator_client_id"`
+	OrchestratorClientSecret types.String `tfsdk:"orchestrator_client_secret"`
+	AISAPIURL                types.String `tfsdk:"ais_api_url"`
+	AISAdminToken            types.String `tfsdk:"ais_admin_token"`
+	ProxyRouterURL           types.String `tfsdk:"proxy_router_url"`
 }
 
 func New(version string) func() provider.Provider {
@@ -72,6 +78,28 @@ func (p *PanesProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 			},
 			"fleet_token": schema.StringAttribute{
 				Description: "Portal-issued JWT (sub + org_id claims). Verified against Auth0 JWKS by Portal. Can also be set with the FLEET_TOKEN environment variable.",
+				Optional:    true,
+				Sensitive:   true,
+			},
+			"orchestrator_url": schema.StringAttribute{
+				Description: "Orchestrator API URL (for panes_managed_agent resources). Can also be set with the ORCHESTRATOR_URL environment variable.",
+				Optional:    true,
+			},
+			"orchestrator_token": schema.StringAttribute{
+				Description: "Pre-minted Orchestrator service JWT. Useful for local development and CI. Can also be set with ORCHESTRATOR_TOKEN.",
+				Optional:    true,
+				Sensitive:   true,
+			},
+			"orchestrator_auth_url": schema.StringAttribute{
+				Description: "Auth service URL used to mint Orchestrator service JWTs. Defaults to https://auth.infra.aiworkflows.com. Can also be set with AUTH_URL.",
+				Optional:    true,
+			},
+			"orchestrator_client_id": schema.StringAttribute{
+				Description: "OAuth2 client ID for minting Orchestrator service JWTs. Can also be set with ORCHESTRATOR_CLIENT_ID.",
+				Optional:    true,
+			},
+			"orchestrator_client_secret": schema.StringAttribute{
+				Description: "OAuth2 client secret for minting Orchestrator service JWTs. Can also be set with ORCHESTRATOR_CLIENT_SECRET.",
 				Optional:    true,
 				Sensitive:   true,
 			},
@@ -149,6 +177,42 @@ func (p *PanesProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		fleetClient = client.NewFleet(fleetURL, fleetToken, orgID)
 	}
 
+	// ---------- Orchestrator client (required if panes_managed_agent is used) ----------
+	orchURL := os.Getenv("ORCHESTRATOR_URL")
+	if !config.OrchestratorURL.IsNull() {
+		orchURL = config.OrchestratorURL.ValueString()
+	}
+
+	orchToken := os.Getenv("ORCHESTRATOR_TOKEN")
+	if !config.OrchestratorToken.IsNull() {
+		orchToken = config.OrchestratorToken.ValueString()
+	}
+
+	orchAuthURL := os.Getenv("AUTH_URL")
+	if !config.OrchestratorAuthURL.IsNull() {
+		orchAuthURL = config.OrchestratorAuthURL.ValueString()
+	}
+
+	orchClientID := os.Getenv("ORCHESTRATOR_CLIENT_ID")
+	if !config.OrchestratorClientID.IsNull() {
+		orchClientID = config.OrchestratorClientID.ValueString()
+	}
+
+	orchClientSecret := os.Getenv("ORCHESTRATOR_CLIENT_SECRET")
+	if !config.OrchestratorClientSecret.IsNull() {
+		orchClientSecret = config.OrchestratorClientSecret.ValueString()
+	}
+
+	var orchClient *client.OrchestratorClient
+	if orchURL != "" {
+		switch {
+		case orchToken != "":
+			orchClient = client.NewOrchestrator(orchURL, orchToken, orgID)
+		case orchClientID != "" && orchClientSecret != "":
+			orchClient = client.NewOrchestratorWithCredentials(orchURL, orchAuthURL, orchClientID, orchClientSecret, orgID)
+		}
+	}
+
 	// ---------- AIS client (required if panes_ais_* resources are used) ----------
 	aisURL := os.Getenv("AIS_API_URL")
 	if !config.AISAPIURL.IsNull() {
@@ -179,19 +243,20 @@ func (p *PanesProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		proxyClient = client.NewProxyRouter(proxyURL)
 	}
 
-	if panesClient == nil && fleetClient == nil && aisClient == nil && proxyClient == nil {
+	if panesClient == nil && fleetClient == nil && orchClient == nil && aisClient == nil && proxyClient == nil {
 		resp.Diagnostics.AddError(
 			"No provider tokens configured",
-			"At least one of PANES_TOKEN, FLEET_TOKEN, AIS_ADMIN_TOKEN, or PROXY_ROUTER_URL must be provided.",
+			"At least one of PANES_TOKEN, FLEET_TOKEN, ORCHESTRATOR_TOKEN/ORCHESTRATOR_CLIENT_ID+SECRET, AIS_ADMIN_TOKEN, or PROXY_ROUTER_URL must be provided.",
 		)
 		return
 	}
 
 	clients := &ProviderClients{
-		Panes:       panesClient,
-		Fleet:       fleetClient,
-		AIS:         aisClient,
-		ProxyRouter: proxyClient,
+		Panes:        panesClient,
+		Fleet:        fleetClient,
+		Orchestrator: orchClient,
+		AIS:          aisClient,
+		ProxyRouter:  proxyClient,
 	}
 	resp.DataSourceData = clients
 	resp.ResourceData = clients
@@ -203,6 +268,7 @@ func (p *PanesProvider) Resources(_ context.Context) []func() resource.Resource 
 		NewAISAccountResource,
 		NewAISAccountLinkResource,
 		NewEngagementResource,
+		NewManagedAgentResource,
 	}
 }
 

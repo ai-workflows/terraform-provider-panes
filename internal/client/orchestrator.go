@@ -321,10 +321,10 @@ func (c *OrchestratorClient) DeleteManagedAgent(ctx context.Context, id string) 
 }
 
 func retryableDeleteStatus(status int) bool {
-	return status == http.StatusTooManyRequests
-		|| status == http.StatusBadGateway
-		|| status == http.StatusServiceUnavailable
-		|| status == http.StatusGatewayTimeout
+	return status == http.StatusTooManyRequests ||
+		status == http.StatusBadGateway ||
+		status == http.StatusServiceUnavailable ||
+		status == http.StatusGatewayTimeout
 }
 
 func waitDeleteRetry(ctx context.Context, attempt int) error {
